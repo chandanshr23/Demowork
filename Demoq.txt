@@ -1,324 +1,150 @@
-// Helpers
-function buildLabel(field) {
-  const req = field.mandatory ? '<span class="text-red-600">*</span>' : '';
-  return `<label for="${field.id}" class="block text-sm font-medium mb-1">${field.title} ${req}</label>`;
-}
+$(document).ready(function () {
+  let formConfig = [];
 
-function buildInput(field) {
-  const common = `id="${field.id}" name="${field.id}" ${field.enable ? '' : 'disabled'} ${field.mandatory ? 'required' : ''}`;
-  const baseCls = "w-full rounded-xl border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 px-3 py-2 outline-none";
-  const disabledCls = field.enable ? "" : "opacity-50 cursor-not-allowed";
-  let extra = [];
-
-  try {
-    switch (field.inputType) {
-      case "select":
-        const opts = (field.options || []).map(o => `<option value="${o.value}">${o.text}</option>`).join('');
-        return `<select ${common} class="${baseCls} ${disabledCls}">
-                  <option value="" disabled selected>Select ${field.title}</option>
-                  ${opts}
-                </select>`;
-
-      case "textarea":
-        return `<textarea ${common} rows="3" class="${baseCls} ${disabledCls}"></textarea>`;
-
-      case "checkbox":
-        return `<input type="checkbox" ${common} class="h-4 w-4 text-indigo-600 border-gray-300 rounded" />`;
-
-      case "date":
-        return `<input type="date" ${common} class="${baseCls} ${disabledCls}">`;
-
-      case "tel":
-        if (field.charLength) {
-          extra = {
-            pattern: `\\d{${field.charLength}}`,
-            inputmode: "numeric",
-            title: `Enter ${field.charLength} digits`,
-            maxlength: field.charLength
-          };
-        }
-        break;
-
-      case "number":
-        extra = { step: "any" };
-        break;
-
-      default:
-        break;
-    }
-
-    // Handle extra attributes if object is used
-    const extraAttrs = Object.entries(extra).map(([k, v]) => `${k}="${v}"`).join(" ");
-    return `<input type="${field.inputType}" ${common} ${extraAttrs} class="${baseCls} ${disabledCls}">`;
-
-  } catch (err) {
-    console.error("Error in buildInput:", err);
-    return `<p class="text-red-500">Error rendering field: ${field.title}</p>`;
-  }
-}
-
-function buildFieldRow(field) {
-  try {
-    switch (true) {
-      case (field.inputType === "checkbox" && field.id === "terms"):
-        return `
-          <div class="flex items-start gap-3 p-4 bg-gray-50 rounded-xl border">
-            ${buildInput(field)}
-            <label for="${field.id}" class="text-sm">I agree to the 
-              <a href="#" class="text-indigo-600 underline">Terms &amp; Conditions</a>.
-            </label>
-          </div>
-        `;
-
-      case (field.inputType === "checkbox"):
-        return `
-          <div class="flex items-center gap-3">
-            ${buildInput(field)}
-            <label for="${field.id}" class="text-sm">${field.title}</label>
-          </div>
-        `;
-
-      default:
-        return `
-          <div>
-            ${buildLabel(field)}
-            ${buildInput(field)}
-          </div>
-        `;
-    }
-  } catch (err) {
-    console.error("Error in buildFieldRow:", err);
-    return `<p class="text-red-500">Error rendering row for ${field.title}</p>`;
-  }
-}
-
-function renderForm(schema) {
-  try {
-    const $form = $("#patientForm");
-    const rows = schema.map(buildFieldRow).join('');
-    const actions = `
-      <div class="pt-2 flex items-center gap-3">
-        <button type="submit" class="px-5 py-2.5 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 focus:ring-2 focus:ring-indigo-500">Submit</button>
-        <button type="button" id="resetBtn" class="px-5 py-2.5 rounded-xl border hover:bg-gray-50">Reset</button>
-      </div>
-    `;
-    $form.html(rows + actions);
-  } catch (err) {
-    console.error("Error in renderForm:", err);
-  }
-}
-
-function collectData(schema) {
-  const data = {};
-  try {
-    schema.forEach(f => {
-      if (!f.enable) return;
-      const $el = $(`#${f.id}`);
-      data[f.id] = (f.inputType === "checkbox") ? $el.is(':checked') : ($el.val() ?? "").trim();
-    });
-  } catch (err) {
-    console.error("Error in collectData:", err);
-  }
-  return data;
-}
-
-function validatePhone($input, requiredLength) {
-  try {
-    const v = ($input.val() || "").trim();
-    if (!v && $input.prop('required')) return false;
-    if (!v) return true;
-    return new RegExp(`^\\d{${requiredLength}}$`).test(v);
-  } catch (err) {
-    console.error("Error in validatePhone:", err);
-    return false;
-  }
-}
-
-// jQuery Ready
-$(function () {
-  try {
-    $.getJSON("../json/patient.json", function (formSchema) {
-      renderForm(formSchema);
-
-      $("#patientForm").on("submit", function (e) {
-        e.preventDefault();
-
-        try {
-          const $phone = $("#phone");
-          const phoneField = formSchema.find(f => f.id === "phone");
-
-          if (phoneField?.charLength && !validatePhone($phone, phoneField.charLength)) {
-            $phone.addClass("ring-2 ring-red-500");
-            $phone[0].setCustomValidity(`Please enter ${phoneField.charLength} digits`);
-            $phone[0].reportValidity();
-            setTimeout(() => $phone.removeClass("ring-2 ring-red-500"), 1500);
-            return;
-          } else if ($phone.length) {
-            $phone[0].setCustomValidity("");
-          }
-
-          if (!this.checkValidity()) {
-            this.reportValidity();
-            return;
-          }
-
-          const data = collectData(formSchema);
-          $("#result").text(JSON.stringify(data, null, 2));
-          $("#resultWrap").removeClass("hidden");
-          window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
-
-        } catch (err) {
-          console.error("Error on form submit:", err);
-        }
-      });
-
-      $("#patientForm").on("input change", "input, select, textarea", function () {
-        $(this).removeClass("ring-2 ring-red-500");
-        this.setCustomValidity("");
-      });
-
-      $("#patientForm").on("click", "#resetBtn", function () {
-        $("#patientForm")[0].reset();
-        $("#resultWrap").addClass("hidden");
-        $("#result").text("");
-      });
-    });
-  } catch (err) {
-    console.error("Error loading schema:", err);
-  }
-});
-    return `<select ${common} class="${baseCls} ${disabledCls}">
-              <option value="" disabled selected>Select ${field.title}</option>
-              ${opts}
-            </select>`;
-  }
-
-  if (field.inputType === 'textarea') {
-    return `<textarea ${common} rows="3" class="${baseCls} ${disabledCls}"></textarea>`;
-  }
-
-  if (field.inputType === 'checkbox') {
-    return `<input type="checkbox" ${common} class="h-4 w-4 text-indigo-600 border-gray-300 rounded" />`;
-  }
-  if(field.inputType=='date'){
-    return `<input type="date" ${common} class="${baseCls} ${disabledCls}">`;
-  }
-
-  const extra = [];
-  if (field.inputType === 'tel' && field.charLength) {
-    extra.push(`pattern="\\d{${field.charLength}}"`);
-    extra.push(`inputmode="numeric"`);
-    extra.push(`title="Enter ${field.charLength} digits"`);
-    extra.push(`maxlength="${field.charLength}"`);
-  }
-  if (field.inputType === 'number') {
-    extra.push('step="any"');
-  }
-  return `<input type="${field.inputType}" ${common} ${extra.join(' ')} class="${baseCls} ${disabledCls}">`;
-}
-
-function buildFieldRow(field) {
-  if (field.inputType === 'checkbox' && field.id === 'terms') {
-    return `
-      <div class="flex items-start gap-3 p-4 bg-gray-50 rounded-xl border">
-        ${buildInput(field)}
-        <label for="${field.id}" class="text-sm">I agree to the <a href="#" class="text-indigo-600 underline">Terms &amp; Conditions</a>.</label>
-      </div>
-    `;
-  }
-
-  if (field.inputType === 'checkbox') {
-    return `
-      <div class="flex items-center gap-3">
-        ${buildInput(field)}
-        <label for="${field.id}" class="text-sm">${field.title}</label>
-      </div>
-    `;
-  }
-
-  return `
-    <div>
-      ${buildLabel(field)}
-      ${buildInput(field)}
-    </div>
-  `;
-}
-
-function renderForm(schema) {
-  const $form = $("#patientForm");
-  const rows = schema.map(buildFieldRow).join('');
-  const actions = `
-    <div class="pt-2 flex items-center gap-3">
-      <button type="submit" class="px-5 py-2.5 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 focus:ring-2 focus:ring-indigo-500">Submit</button>
-      <button type="button" id="resetBtn" class="px-5 py-2.5 rounded-xl border hover:bg-gray-50">Reset</button>
-    </div>
-  `;
-  $form.html(rows + actions);
-}
-
-function collectData(schema) {
-  const data = {};
-  schema.forEach(f => {
-    if (!f.enable) return;
-    const $el = $(`#${f.id}`);
-    if (f.inputType === 'checkbox') {
-      data[f.id] = $el.is(':checked');
-    } else {
-      data[f.id] = ($el.val() ?? "").trim();
-    }
+  // Load patient schema
+  $.getJSON("../json/patient.json", function (data) {
+    formConfig = data;
+    buildForm();
+  }).fail(function () {
+    console.error("❌ Failed to load patient.json");
   });
-  return data;
-}
 
-function validatePhone($input, requiredLength) {
-  const v = ($input.val() || "").trim();
-  if (!v && $input.prop('required')) return false;
-  if (!v) return true;
-  return new RegExp(`^\\d{${requiredLength}}$`).test(v);
-}
+  let $form = $("#patientForm");
 
-// jQuery Ready
-$(function() {
-  // Load schema from JSON
-  $.getJSON("../json/patient.json", function(formSchema) {
-    renderForm(formSchema);
+  function createDiv(type = "smart-input") {
+    return $("<div>").addClass(type);
+  }
 
-    $("#patientForm").on("submit", function(e) {
+  function createFields(field) {
+    return $("<label>")
+      .attr("for", field.id)
+      .text(field.title + (field.mandatory ? " *" : ""));
+  }
+
+  function commonAttributes($input, field) {
+    $input.attr("id", field.id);
+    if (!field.enable) $input.prop("disabled", true);
+    if (field.mandatory) $input.prop("required", true);
+    return $input;
+  }
+
+  function createFormField(field) {
+    let $div, $input, $label;
+
+    try {
+      switch (field.inputType) {
+        case "select":
+          $div = createDiv();
+          $input = $("<select>").addClass("peer");
+          $input.append(
+            $("<option>")
+              .val("")
+              .text("Select " + field.title)
+              .prop("selected", true)
+              .prop("disabled", true)
+              .prop("hidden", true)
+          );
+          $.each(field.options || [], (_, opt) => {
+            $input.append($("<option>").val(opt.value).text(opt.text));
+          });
+          $label = createFields(field);
+          $div.append($input).append($label);
+          break;
+
+        case "textarea":
+          $div = createDiv();
+          $input = $("<textarea>").addClass("peer").attr("placeholder", " ");
+          $label = createFields(field);
+          $div.append($input).append($label);
+          break;
+
+        case "checkbox":
+          $div = createDiv("flex items-center space-x-2");
+          $input = $("<input>").attr("type", "checkbox").addClass("w-5 h-5");
+          $label = createFields(field)
+            .removeClass()
+            .addClass("text-gray-700 font-medium");
+          $div.append($input).append($label);
+          break;
+
+        case "date":
+        case "text":
+        case "tel":
+        case "number":
+          $div = createDiv();
+          $input = $("<input>")
+            .attr("type", field.inputType)
+            .addClass("peer")
+            .attr("placeholder", " ");
+          if (field.charLength) $input.attr("maxlength", field.charLength);
+          $label = createFields(field);
+          $div.append($input).append($label);
+          break;
+
+        default:
+          console.warn("⚠ Unknown input type:", field.inputType);
+          return;
+      }
+
+      $input = commonAttributes($input, field);
+      $form.find("button[type=submit]").before($div);
+    } catch (err) {
+      console.error("❌ Error creating field:", field, err);
+    }
+  }
+
+  function buildForm() {
+    $.each(formConfig, (_, field) => createFormField(field));
+
+    $form.on("submit", function (e) {
       e.preventDefault();
 
-      const $phone = $("#phone");
-      const phoneField = formSchema.find(f => f.id === "phone");
-      if (phoneField?.charLength && !validatePhone($phone, phoneField.charLength)) {
-        $phone.addClass("ring-2 ring-red-500");
-        $phone[0].setCustomValidity(`Please enter ${phoneField.charLength} digits`);
-        $phone[0].reportValidity();
-        setTimeout(() => $phone.removeClass("ring-2 ring-red-500"), 1500);
-        return;
-      } else if ($phone.length) {
-        $phone[0].setCustomValidity("");
+      let formValues = {};
+      let validAll = true;
+
+      try {
+        $.each(formConfig, (_, field) => {
+          let $element = $("#" + field.id);
+          let value =
+            field.inputType === "checkbox"
+              ? $element.prop("checked")
+              : $element.val();
+
+          // === Validations ===
+          if (field.mandatory && !value) {
+            alert(field.title + " is required!");
+            validAll = false;
+            return false; // break out
+          }
+
+          if (field.id === "phone" && value) {
+            if (!/^\d{10}$/.test(value)) {
+              alert("Please enter a valid 10-digit phone number.");
+              validAll = false;
+              return false;
+            }
+          }
+
+          if (field.id === "birthDate" && value) {
+            let today = new Date().toISOString().split("T")[0];
+            if (value > today) {
+              alert("Birth Date cannot be in the future.");
+              validAll = false;
+              return false;
+            }
+          }
+
+          formValues[field.id] = value;
+        });
+
+        if (!validAll) return;
+
+        console.log("✅ Patient Form Submitted:", formValues);
+        alert("Form submitted successfully!");
+      } catch (err) {
+        console.error("❌ Error on patient form submit:", err);
+        alert("Something went wrong, please try again.");
       }
-
-      if (!this.checkValidity()) {
-        this.reportValidity();
-        return;
-      }
-
-      const data = collectData(formSchema);
-      $("#result").text(JSON.stringify(data, null, 2));
-      $("#resultWrap").removeClass("hidden");
-      window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
     });
-
-    $("#patientForm").on("input change", "input, select, textarea", function() {
-      $(this).removeClass("ring-2 ring-red-500");
-      this.setCustomValidity("");
-    });
-
-    $("#patientForm").on("click", "#resetBtn", function() {
-      $("#patientForm")[0].reset();
-      $("#resultWrap").addClass("hidden");
-      $("#result").text("");
-
-    });
-  });
+  }
 });
