@@ -1,12 +1,12 @@
 $(document).ready(function () {
   let formConfig = [];
 
-  // Load patient schema
+  // Load patient data
   $.getJSON("../json/patient.json", function (data) {
     formConfig = data;
     buildForm();
   }).fail(function () {
-    console.error("❌ Failed to load patient.json");
+    console.error("Failed to load patient.json");
   });
 
   let $form = $("#patientForm");
@@ -23,6 +23,7 @@ $(document).ready(function () {
 
   function commonAttributes($input, field) {
     $input.attr("id", field.id);
+    $input.attr("name", field.id);
     if (!field.enable) $input.prop("disabled", true);
     if (field.mandatory) $input.prop("required", true);
     return $input;
@@ -42,7 +43,6 @@ $(document).ready(function () {
               .text("Select " + field.title)
               .prop("selected", true)
               .prop("disabled", true)
-              .prop("hidden", true)
           );
           $.each(field.options || [], (_, opt) => {
             $input.append($("<option>").val(opt.value).text(opt.text));
@@ -77,24 +77,38 @@ $(document).ready(function () {
             .addClass("peer")
             .attr("placeholder", " ");
           if (field.charLength) $input.attr("maxlength", field.charLength);
+          if (field.inputType == "number") $input.attr("step", "any");
           $label = createFields(field);
           $div.append($input).append($label);
           break;
 
         default:
-          console.warn("⚠ Unknown input type:", field.inputType);
+          console.warn("Unknown input type:", field.inputType);
           return;
       }
 
       $input = commonAttributes($input, field);
-      $form.find("button[type=submit]").before($div);
+
+      // Append field to form (previous code tried to insert before a non-existing submit button)
+      $form.append($div);
     } catch (err) {
-      console.error("❌ Error creating field:", field, err);
+      console.error("Error creating field:", field, err);
     }
   }
 
   function buildForm() {
+    $form.empty();
+
     $.each(formConfig, (_, field) => createFormField(field));
+
+    // Add form actions (submit & reset)
+    const $actions = $(
+      '<div class="pt-2 flex items-center gap-3">' +
+        '<button type="submit" class="px-5 py-2.5 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 focus:ring-2 focus:ring-indigo-500">Submit</button>' +
+        '<button type="button" id="resetBtn" class="px-5 py-2.5 rounded-xl border hover:bg-gray-50">Reset</button>' +
+      "</div>"
+    );
+    $form.append($actions);
 
     $form.on("submit", function (e) {
       e.preventDefault();
@@ -106,26 +120,33 @@ $(document).ready(function () {
         $.each(formConfig, (_, field) => {
           let $element = $("#" + field.id);
           let value =
-            field.inputType === "checkbox"
+            field.inputType == "checkbox"
               ? $element.prop("checked")
-              : $element.val();
+              : ($element.val() == null ? "" : $element.val().toString().trim());
 
-          // === Validations ===
-          if (field.mandatory && !value) {
-            alert(field.title + " is required!");
-            validAll = false;
-            return false; // break out
+          // == Validations ==
+          if (field.mandatory) {
+            // For checkboxes, value is boolean
+            const empty = field.inputType == "checkbox" ? !value : value == "";
+            if (empty) {
+              alert(field.title + " is required!");
+              validAll = false;
+              return false; // break out
+            }
           }
 
-          if (field.id === "phone" && value) {
-            if (!/^\d{10}$/.test(value)) {
-              alert("Please enter a valid 10-digit phone number.");
+          if (field.id == "phone" && value) {
+            // use charLength if provided
+            const len = field.charLength || 10;
+            const re = new RegExp("^\\d{" + len + "}$");
+            if (!re.test(value)) {
+              alert("Please enter a valid " + len + "-digit phone number.");
               validAll = false;
               return false;
             }
           }
 
-          if (field.id === "birthDate" && value) {
+          if (field.id == "birthDate" && value) {
             let today = new Date().toISOString().split("T")[0];
             if (value > today) {
               alert("Birth Date cannot be in the future.");
@@ -139,12 +160,23 @@ $(document).ready(function () {
 
         if (!validAll) return;
 
-        console.log("✅ Patient Form Submitted:", formValues);
+        console.log("Patient Form Submitted:", formValues);
+        // show result area
+        $("#result").text(JSON.stringify(formValues, null, 2));
+        $("#resultWrap").removeClass("hidden");
         alert("Form submitted successfully!");
       } catch (err) {
-        console.error("❌ Error on patient form submit:", err);
+        console.error(" Error on patient form submit:", err);
         alert("Something went wrong, please try again.");
       }
+    });
+
+    // Reset handler
+    $form.on("click", "#resetBtn", function () {
+      const formEl = $form[0];
+      if (formEl) formEl.reset();
+      $("#resultWrap").addClass("hidden");
+      $("#result").text("");
     });
   }
 });
