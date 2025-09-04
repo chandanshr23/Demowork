@@ -8,9 +8,185 @@ function buildInput(field) {
   const common = `id="${field.id}" name="${field.id}" ${field.enable ? '' : 'disabled'} ${field.mandatory ? 'required' : ''}`;
   const baseCls = "w-full rounded-xl border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 px-3 py-2 outline-none";
   const disabledCls = field.enable ? "" : "opacity-50 cursor-not-allowed";
+  let extra = [];
 
-  if (field.inputType === 'select') {
-    const opts = (field.options || []).map(o => `<option value="${o.value}">${o.text}</option>`).join('');
+  try {
+    switch (field.inputType) {
+      case "select":
+        const opts = (field.options || []).map(o => `<option value="${o.value}">${o.text}</option>`).join('');
+        return `<select ${common} class="${baseCls} ${disabledCls}">
+                  <option value="" disabled selected>Select ${field.title}</option>
+                  ${opts}
+                </select>`;
+
+      case "textarea":
+        return `<textarea ${common} rows="3" class="${baseCls} ${disabledCls}"></textarea>`;
+
+      case "checkbox":
+        return `<input type="checkbox" ${common} class="h-4 w-4 text-indigo-600 border-gray-300 rounded" />`;
+
+      case "date":
+        return `<input type="date" ${common} class="${baseCls} ${disabledCls}">`;
+
+      case "tel":
+        if (field.charLength) {
+          extra = {
+            pattern: `\\d{${field.charLength}}`,
+            inputmode: "numeric",
+            title: `Enter ${field.charLength} digits`,
+            maxlength: field.charLength
+          };
+        }
+        break;
+
+      case "number":
+        extra = { step: "any" };
+        break;
+
+      default:
+        break;
+    }
+
+    // Handle extra attributes if object is used
+    const extraAttrs = Object.entries(extra).map(([k, v]) => `${k}="${v}"`).join(" ");
+    return `<input type="${field.inputType}" ${common} ${extraAttrs} class="${baseCls} ${disabledCls}">`;
+
+  } catch (err) {
+    console.error("Error in buildInput:", err);
+    return `<p class="text-red-500">Error rendering field: ${field.title}</p>`;
+  }
+}
+
+function buildFieldRow(field) {
+  try {
+    switch (true) {
+      case (field.inputType === "checkbox" && field.id === "terms"):
+        return `
+          <div class="flex items-start gap-3 p-4 bg-gray-50 rounded-xl border">
+            ${buildInput(field)}
+            <label for="${field.id}" class="text-sm">I agree to the 
+              <a href="#" class="text-indigo-600 underline">Terms &amp; Conditions</a>.
+            </label>
+          </div>
+        `;
+
+      case (field.inputType === "checkbox"):
+        return `
+          <div class="flex items-center gap-3">
+            ${buildInput(field)}
+            <label for="${field.id}" class="text-sm">${field.title}</label>
+          </div>
+        `;
+
+      default:
+        return `
+          <div>
+            ${buildLabel(field)}
+            ${buildInput(field)}
+          </div>
+        `;
+    }
+  } catch (err) {
+    console.error("Error in buildFieldRow:", err);
+    return `<p class="text-red-500">Error rendering row for ${field.title}</p>`;
+  }
+}
+
+function renderForm(schema) {
+  try {
+    const $form = $("#patientForm");
+    const rows = schema.map(buildFieldRow).join('');
+    const actions = `
+      <div class="pt-2 flex items-center gap-3">
+        <button type="submit" class="px-5 py-2.5 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 focus:ring-2 focus:ring-indigo-500">Submit</button>
+        <button type="button" id="resetBtn" class="px-5 py-2.5 rounded-xl border hover:bg-gray-50">Reset</button>
+      </div>
+    `;
+    $form.html(rows + actions);
+  } catch (err) {
+    console.error("Error in renderForm:", err);
+  }
+}
+
+function collectData(schema) {
+  const data = {};
+  try {
+    schema.forEach(f => {
+      if (!f.enable) return;
+      const $el = $(`#${f.id}`);
+      data[f.id] = (f.inputType === "checkbox") ? $el.is(':checked') : ($el.val() ?? "").trim();
+    });
+  } catch (err) {
+    console.error("Error in collectData:", err);
+  }
+  return data;
+}
+
+function validatePhone($input, requiredLength) {
+  try {
+    const v = ($input.val() || "").trim();
+    if (!v && $input.prop('required')) return false;
+    if (!v) return true;
+    return new RegExp(`^\\d{${requiredLength}}$`).test(v);
+  } catch (err) {
+    console.error("Error in validatePhone:", err);
+    return false;
+  }
+}
+
+// jQuery Ready
+$(function () {
+  try {
+    $.getJSON("../json/patient.json", function (formSchema) {
+      renderForm(formSchema);
+
+      $("#patientForm").on("submit", function (e) {
+        e.preventDefault();
+
+        try {
+          const $phone = $("#phone");
+          const phoneField = formSchema.find(f => f.id === "phone");
+
+          if (phoneField?.charLength && !validatePhone($phone, phoneField.charLength)) {
+            $phone.addClass("ring-2 ring-red-500");
+            $phone[0].setCustomValidity(`Please enter ${phoneField.charLength} digits`);
+            $phone[0].reportValidity();
+            setTimeout(() => $phone.removeClass("ring-2 ring-red-500"), 1500);
+            return;
+          } else if ($phone.length) {
+            $phone[0].setCustomValidity("");
+          }
+
+          if (!this.checkValidity()) {
+            this.reportValidity();
+            return;
+          }
+
+          const data = collectData(formSchema);
+          $("#result").text(JSON.stringify(data, null, 2));
+          $("#resultWrap").removeClass("hidden");
+          window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
+
+        } catch (err) {
+          console.error("Error on form submit:", err);
+        }
+      });
+
+      $("#patientForm").on("input change", "input, select, textarea", function () {
+        $(this).removeClass("ring-2 ring-red-500");
+        this.setCustomValidity("");
+      });
+
+      $("#patientForm").on("click", "#resetBtn", function () {
+        $("#patientForm")[0].reset();
+        $("#resultWrap").addClass("hidden");
+        $("#result").text("");
+      });
+    });
+  } catch (err) {
+    console.error("Error loading schema:", err);
+  }
+});
     return `<select ${common} class="${baseCls} ${disabledCls}">
               <option value="" disabled selected>Select ${field.title}</option>
               ${opts}
