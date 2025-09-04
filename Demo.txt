@@ -24,6 +24,9 @@ function buildInput(field) {
   if (field.inputType === 'checkbox') {
     return `<input type="checkbox" ${common} class="h-4 w-4 text-indigo-600 border-gray-300 rounded" />`;
   }
+  if(field.inputType=='date'){
+    return `<input type="date" ${common} class="${baseCls} ${disabledCls}">`;
+  }
 
   const extra = [];
   if (field.inputType === 'tel' && field.charLength) {
@@ -66,7 +69,7 @@ function buildFieldRow(field) {
 }
 
 function renderForm(schema) {
-  const $form = $("#registrationForm");
+  const $form = $("#patientForm");
   const rows = schema.map(buildFieldRow).join('');
   const actions = `
     <div class="pt-2 flex items-center gap-3">
@@ -101,10 +104,10 @@ function validatePhone($input, requiredLength) {
 // jQuery Ready
 $(function() {
   // Load schema from JSON
-  $.getJSON("formSchema.json", function(formSchema) {
+  $.getJSON("../json/patient.json", function(formSchema) {
     renderForm(formSchema);
 
-    $("#registrationForm").on("submit", function(e) {
+    $("#patientForm").on("submit", function(e) {
       e.preventDefault();
 
       const $phone = $("#phone");
@@ -130,15 +133,17 @@ $(function() {
       window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
     });
 
-    $("#registrationForm").on("input change", "input, select, textarea", function() {
+    $("#patientForm").on("input change", "input, select, textarea", function() {
       $(this).removeClass("ring-2 ring-red-500");
       this.setCustomValidity("");
     });
 
-    $("#registrationForm").on("click", "#resetBtn", function() {
-      $("#registrationForm")[0].reset();
+    $("#patientForm").on("click", "#resetBtn", function() {
+      $("#patientForm")[0].reset();
       $("#resultWrap").addClass("hidden");
       $("#result").text("");
+
     });
   });
 });
+
