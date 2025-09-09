@@ -1,98 +1,268 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Simple Patient Form</title>
-  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-  <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="p-6 bg-gray-50">
+$(document).ready(function () {
+  let formConfig = [];
 
-  <h2 class="text-xl font-bold mb-4">Patient Form</h2>
+  // Load JSON
+  $.getJSON("../Json/registration.json", function (data) {
+    formConfig = data;
+    buildForm();
+  }).fail(function () {
+    console.error("Failed to load patient.json");
+  });
 
-  <!-- Simple Form -->
-  <form id="patientForm" class="mb-4 space-y-2">
-    <input type="text" id="name" placeholder="Name" class="border p-1 w-full rounded">
-    <input type="text" id="bloodGroup" placeholder="Blood Group" class="border p-1 w-full rounded">
-    <input type="text" id="bmi" placeholder="BMI" class="border p-1 w-full rounded">
-    <button type="submit" class="bg-blue-500 text-white px-3 py-1 rounded">Save</button>
-  </form>
+  let $form = $("#patientForm");
 
-  <!-- Table -->
-  <table class="w-full border border-gray-300 bg-white rounded">
-    <thead class="bg-gray-100">
-      <tr>
-        <th class="p-2 border">Name</th>
-        <th class="p-2 border">Blood Group</th>
-        <th class="p-2 border">BMI</th>
-        <th class="p-2 border">Actions</th>
-      </tr>
-    </thead>
-    <tbody id="patientsBody"></tbody>
-  </table>
+  // Div callaback
+  function createDiv(type = "smart-input") {
+    return $("<div>").addClass(type);
+  }
 
-  <script>
-    $(document).ready(function() {
-      let patients = JSON.parse(localStorage.getItem('patients')) || [];
-      let editIndex = -1;
+  // Field callaback
+  function createFields(field) {
+    return $("<label>")
+      .attr("for", field.id)
+      .text(field.title + (field.mandatory ? " *" : ""));
+  }
 
-      function renderTable() {
-        let $tbody = $('#patientsBody');
-        $tbody.empty();
-        patients.forEach((p, index) => {
-          $tbody.append(`
-            <tr class="border-b">
-              <td class="p-2 border">${p.name}</td>
-              <td class="p-2 border">${p.bloodGroup}</td>
-              <td class="p-2 border">${p.bmi}</td>
-              <td class="p-2 border">
-                <button class="edit bg-yellow-400 px-2 py-1 rounded mr-1" data-index="${index}">Edit</button>
-                <button class="delete bg-red-500 px-2 py-1 rounded" data-index="${index}">Delete</button>
-              </td>
-            </tr>
-          `);
+  // common Attributes Callback
+  function commonAttributes($input, field) {
+    $input.attr("id", field.id);
+    $input.attr("name", field.id);
+    if (field.enable == false) $input.prop("disabled", true);
+    if (field.mandatory) $input.prop("required", true);
+    return $input;
+  }
+
+  // Create  form field
+  function createFormField(field) {
+    let $div, $input, $label;
+
+    try {
+      switch (field.inputType) {
+        case "select":
+          $div = createDiv();
+          $input = $("<select>").addClass("peer");
+          $input.append(
+            $("<option>")
+              .val("")
+              .text("Select " + field.title)
+              .prop("selected", true)
+              .prop("disabled", true)
+          );
+          $.each(field.options || [], (index, opt) => {
+            $input.append($("<option>").val(opt.value).text(opt.text));
+          });
+          $label = createFields(field);
+          $div.append($input);
+          break;
+          
+          case "radio":
+            $div=createDiv();
+            $input=$("<radio>").addClass("peer");
+            $input.append(
+                $("<option>")
+                .prop("selected",true)
+                .prop("disabled",true)    
+
+            .attr("placeholder",field.title)
+            .addClass("w-5 h-5")
+            );
+            $label=createFields(field)
+            .removeClass()
+            .addClass("text-gray-700 font-medium");
+            $div.append($input).append($label);
+            break;
+
+        case "textarea":
+          $div = createDiv();
+          $input = $("<textarea>")
+            .addClass("peer")
+            .attr("placeholder", field.title);
+          $label = createFields(field);
+          $div.append($input);
+          break;
+
+        case "checkbox":
+          $div = createDiv("flex items-center space-x-2");
+          $input = $("<input>")
+            .attr("type", "checkbox")
+            .addClass("w-5 h-5");
+          $label = createFields(field)
+            .removeClass()
+            .addClass("text-gray-700 font-medium");
+          $div.append($input).append($label);
+          break;
+
+         case "date":
+          $div = createDiv();
+          $input = $("<input>").attr({
+            type: "text",
+            id: field.id,
+            required: field.mandatory || false,
+            disabled: field.enable==false,
+            placeholder : "Date of Birth"
+          }).addClass("datepicker peer");  
+          $label = createFields(field);
+          $div.append($input)
+          break;
+
+
+        case "text":
+        case "tel":
+        case "number":
+          $div = createDiv();
+          $input = $("<input>")
+            .attr("type", field.inputType)
+            .addClass("peer")
+            .attr("placeholder", field.title);
+          if (field.charLength) $input.attr("maxlength", field.charLength);
+          if (field.inputType == "number") $input.attr("step", "any");
+          $label = createFields(field);
+          $div.append($input);
+          break;
+
+        default:
+          console.warn("Unknown input type:", field.inputType);
+          return;
+      }
+
+      $input = commonAttributes($input, field);
+
+      // Add field to the form
+      $form.append($div);
+
+    } catch (err) {
+      console.error("Error creating field:", field, err);
+    }
+  }
+
+  // to claculate age automatically and fill
+      function calculateAge(dateStr) {
+        let d = new Date(dateStr);
+        if (isNaN(d)) return "";
+        let diff = Date.now() - d.getTime();
+        return new Date(diff).getUTCFullYear() - 1970;
+      }
+
+      function setupAutoFill(field) {
+        if (!field.autoFill) return;
+
+        $("#" + field.id).on("change", function () {
+          let val = $(this).val();
+          if (!val) return;
+
+          let result;
+          switch (field.autoFill.type) {
+            case "age":
+              result = calculateAge(val);
+              break;
+          }
+          $("#" + field.autoFill.target).val(result);
         });
       }
 
-      renderTable();
+  // Build the form
+  function buildForm() { 
+    $form.empty();
 
-      $('#patientForm').submit(function(e) {
-        e.preventDefault();
-        let patient = {
-          name: $('#name').val(),
-          bloodGroup: $('#bloodGroup').val(),
-          bmi: $('#bmi').val()
-        };
+    $.each(formConfig, (index, field) => {
+      createFormField(field);
+    setupAutoFill(field);
+  });
 
-        if(editIndex === -1) {
-          patients.push(patient);
-        } else {
-          patients[editIndex] = patient;
-          editIndex = -1;
-        }
+    // Action buttons
+    let $actions = $(`
+      <div class="pt-2 flex items-center gap-3">
+        <button type="submit" class="px-5 py-2.5 rounded-xl bg-green-700  text-white hover:bg-green-300 focus:ring-2 focus:ring-indigo-500">Submit</button>
+        <button type="button" id="resetBtn" class="px-5 py-2.5 rounded-xl border hover:bg-gray-50">Reset</button>
+      </div>
+    `);
+    $form.append($actions);
 
-        localStorage.setItem('patients', JSON.stringify(patients));
-        renderTable();
-        $(this)[0].reset();
-      });
+    // Submit butoon
+    $form.on("submit", function (e) {
+      e.preventDefault();
 
-      $(document).on('click', '.edit', function() {
-        editIndex = $(this).data('index');
-        let p = patients[editIndex];
-        $('#name').val(p.name);
-        $('#bloodGroup').val(p.bloodGroup);
-        $('#bmi').val(p.bmi);
-      });
+      let formValues = {};
+      let validAll = true;
 
-      $(document).on('click', '.delete', function() {
-        let index = $(this).data('index');
-        patients.splice(index, 1);
-        localStorage.setItem('patients', JSON.stringify(patients));
-        renderTable();
-      });
+      try {
+        $.each(formConfig, (index, field) => {
+          let $element = $("#" + field.id);
+          let value =
+            field.inputType == "checkbox"
+              ? $element.prop("checked")
+              : $element.val() == null
+              ? ""
+              : $element.val().toString().trim();
+
+          if (field.mandatory) {
+            let empty =
+              field.inputType == "checkbox" ? value==null:value=="";
+            if (empty) {
+              alert(field.title + " is required!");
+              validAll = false;
+              return false;
+            }
+          }
+
+          if (field.id == "phone" && value) {
+            let len = field.charLength || 10;
+            let re = new RegExp("^\\d{" + len + "}$");
+            if (re.test(value) == false) {
+              alert("Please enter a valid " + len + "-digit phone number.");
+              validAll = false;
+              return false;
+            }
+          }
+
+          if (field.id == "birthDate" && value) {
+            let today = new Date().toISOString().split("T")[0];
+            if (new Date(value) > new Date(today)) {
+              alert("Birth Date cannot be in the future.");
+              validAll = false;
+              return false;
+            }
+          }
+
+          formValues[field.id] = value;
+        });
+
+        if (validAll == false) return;
+
+        // Local Storage save
+        let allPatients = JSON.parse(localStorage.getItem("patients")) || [];
+        allPatients.push(formValues);
+        localStorage.setItem("patients", JSON.stringify(allPatients));
+
+        // Result display 
+        console.log("Patient Form Submitted & Saved:", formValues);
+        $("#result").text(JSON.stringify(formValues, null, 2));
+        $("#resultWrap").removeClass("hidden");
+        alert("Form submitted & saved successfully!");
+
+        window.location.href="../Html/report.html";
+      } 
+        catch (err) {
+        console.error("Error on patient form submit:", err);
+        alert("Something went wrong, please try again.");
+      }
     });
-  </script>
 
-</body>
-</html>
+    // Reset button
+    $form.on("click", "#resetBtn", function () {
+      let formEl = $form[0];
+      if (formEl) formEl.reset();
+      $("#resultWrap").addClass("hidden");
+      $("#result").text("");
+    });
+
+    //Date Picker Plugin
+    $(".datepicker").datepicker({
+      changeMonth: true,
+      changeYear: true,
+      yearRange: "1900:+0",
+      dateFormat: "yy-mm-dd"
+    });
+  }
+  
+});
