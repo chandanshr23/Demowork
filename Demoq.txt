@@ -1,268 +1,336 @@
 $(document).ready(function () {
-  let formConfig = [];
+  console.log("JS loaded");
 
   // Load JSON
   $.getJSON("../Json/registration.json", function (data) {
-    formConfig = data;
-    buildForm();
-  }).fail(function () {
-    console.error("Failed to load patient.json");
-  });
+    console.log("JSON loaded:", data);
+    buildForm(data);
+  }).fail(function (xhr, status, err) {
+    console.error("Failed to load registration.json", err);
+  }); 
 
-  let $form = $("#patientForm");
+  // Main builder
+  function buildForm(fields) {
+    let formHtml = "";
 
-  // Div callaback
-  function createDiv(type = "smart-input") {
-    return $("<div>").addClass(type);
-  }
-
-  // Field callaback
-  function createFields(field) {
-    return $("<label>")
-      .attr("for", field.id)
-      .text(field.title + (field.mandatory ? " *" : ""));
-  }
-
-  // common Attributes Callback
-  function commonAttributes($input, field) {
-    $input.attr("id", field.id);
-    $input.attr("name", field.id);
-    if (field.enable == false) $input.prop("disabled", true);
-    if (field.mandatory) $input.prop("required", true);
-    return $input;
-  }
-
-  // Create  form field
-  function createFormField(field) {
-    let $div, $input, $label;
-
-    try {
+    fields.forEach(function (field) {
       switch (field.inputType) {
-        case "select":
-          $div = createDiv();
-          $input = $("<select>").addClass("peer");
-          $input.append(
-            $("<option>")
-              .val("")
-              .text("Select " + field.title)
-              .prop("selected", true)
-              .prop("disabled", true)
-          );
-          $.each(field.options || [], (index, opt) => {
-            $input.append($("<option>").val(opt.value).text(opt.text));
-          });
-          $label = createFields(field);
-          $div.append($input);
+        case "text":
+        case "tel":
+        case "password":
+        case "number":
+        case "email":
+          formHtml += `
+            <div>
+              <label for="${field.id}" class="block font-medium">${field.title}${field.mandatory ? "*" : ""}</label>
+              <input type="${field.inputType}" id="${field.id}" name="${field.id}"
+                class="border p-2 w-full"
+                ${field.charLength ? `maxlength="${field.charLength}"` : ""}
+                ${field.min ? `min="${field.min}"` : ""}
+                ${field.max ? `max="${field.max}"` : ""}
+                ${field.mandatory ? "required" : ""}
+                ${field.enable == false ? "disabled" : ""} />
+            </div>`;
           break;
-          
-          case "radio":
-            $div=createDiv();
-            $input=$("<radio>").addClass("peer");
-            $input.append(
-                $("<option>")
-                .prop("selected",true)
-                .prop("disabled",true)    
-
-            .attr("placeholder",field.title)
-            .addClass("w-5 h-5")
-            );
-            $label=createFields(field)
-            .removeClass()
-            .addClass("text-gray-700 font-medium");
-            $div.append($input).append($label);
-            break;
 
         case "textarea":
-          $div = createDiv();
-          $input = $("<textarea>")
-            .addClass("peer")
-            .attr("placeholder", field.title);
-          $label = createFields(field);
-          $div.append($input);
+          formHtml += `
+            <div>
+              <label for="${field.id}" class="block font-medium">${field.title}</label>
+              <textarea id="${field.id}" name="${field.id}" class="border p-2 w-full"
+                ${field.mandatory ? "required" : ""}
+                ${field.enable == false ? "disabled" : ""}></textarea>
+            </div>`;
+          break;
+
+        case "select":
+          let options = field.options.map(opt =>
+            `<option value="${opt.value}">${opt.text}</option>`
+          ).join("");
+          formHtml += `
+            <div>
+              <label for="${field.id}" class="block font-medium">${field.title}${field.mandatory ? "*" : ""}</label>
+              <select id="${field.id}" name="${field.id}" class="border p-2 w-full"
+                ${field.mandatory ? "required" : ""}
+                ${field.enable == false ? "disabled" : ""}>
+                <option value="">Select ${field.title}</option>
+                ${options}
+              </select>
+            </div>`;
+          break;
+
+        case "radio":
+          let radios = field.options.map(opt =>
+            `<label class="mr-4"><input type="radio" name="${field.id}" value="${opt.value}" ${field.mandatory ? "required" : ""}> ${opt.text}</label>`
+          ).join(" ");
+          formHtml += `
+            <div>
+              <span class="block font-medium">${field.title}${field.mandatory ? "*" : ""}</span>
+              ${radios}
+            </div>`;
+          break;
+
+        case "date":
+          formHtml += `
+            <div>
+              <label for="${field.id}" class="block font-medium">${field.title}${field.mandatory ? "*" : ""}</label>
+              <input type="text" id="${field.id}" name="${field.id}" class="datepicker border p-2 w-full"
+                ${field.mandatory ? "required" : ""}
+                ${field.enable == false ? "disabled" : ""} />
+            </div>`; 
+          break;
+
+        case "country":
+          formHtml += `
+            <div>
+              <label for="${field.id}" class="block font-medium">${field.title}${field.mandatory ? "*" : ""}</label>
+              <input type="text" id="${field.id}" name="${field.id}" class="country-select border p-2 w-full"
+                ${field.mandatory ? "required" : ""} 
+                ${field.enable == false ? "disabled" : ""} />
+            </div>`;
           break;
 
         case "checkbox":
-          $div = createDiv("flex items-center space-x-2");
-          $input = $("<input>")
-            .attr("type", "checkbox")
-            .addClass("w-5 h-5");
-          $label = createFields(field)
-            .removeClass()
-            .addClass("text-gray-700 font-medium");
-          $div.append($input).append($label);
-          break;
-
-         case "date":
-          $div = createDiv();
-          $input = $("<input>").attr({
-            type: "text",
-            id: field.id,
-            required: field.mandatory || false,
-            disabled: field.enable==false,
-            placeholder : "Date of Birth"
-          }).addClass("datepicker peer");  
-          $label = createFields(field);
-          $div.append($input)
-          break;
-
-
-        case "text":
-        case "tel":
-        case "number":
-          $div = createDiv();
-          $input = $("<input>")
-            .attr("type", field.inputType)
-            .addClass("peer")
-            .attr("placeholder", field.title);
-          if (field.charLength) $input.attr("maxlength", field.charLength);
-          if (field.inputType == "number") $input.attr("step", "any");
-          $label = createFields(field);
-          $div.append($input);
+          formHtml += `
+            <div class="flex items-center">
+              <input type="checkbox" id="${field.id}" name="${field.id}" class="mr-2"
+                ${field.mandatory ? "required" : ""}
+                ${field.enable == false ? "disabled" : ""} />
+              <label for="${field.id}" class="font-medium">${field.title}${field.mandatory ? "*" : ""}</label>
+            </div>`;
           break;
 
         default:
           console.warn("Unknown input type:", field.inputType);
-          return;
       }
-
-      $input = commonAttributes($input, field);
-
-      // Add field to the form
-      $form.append($div);
-
-    } catch (err) {
-      console.error("Error creating field:", field, err);
-    }
-  }
-
-  // to claculate age automatically and fill
-      function calculateAge(dateStr) {
-        let d = new Date(dateStr);
-        if (isNaN(d)) return "";
-        let diff = Date.now() - d.getTime();
-        return new Date(diff).getUTCFullYear() - 1970;
-      }
-
-      function setupAutoFill(field) {
-        if (!field.autoFill) return;
-
-        $("#" + field.id).on("change", function () {
-          let val = $(this).val();
-          if (!val) return;
-
-          let result;
-          switch (field.autoFill.type) {
-            case "age":
-              result = calculateAge(val);
-              break;
-          }
-          $("#" + field.autoFill.target).val(result);
-        });
-      }
-
-  // Build the form
-  function buildForm() { 
-    $form.empty();
-
-    $.each(formConfig, (index, field) => {
-      createFormField(field);
-    setupAutoFill(field);
-  });
+    });
 
     // Action buttons
-    let $actions = $(`
-      <div class="pt-2 flex items-center gap-3">
-        <button type="submit" class="px-5 py-2.5 rounded-xl bg-green-700  text-white hover:bg-green-300 focus:ring-2 focus:ring-indigo-500">Submit</button>
-        <button type="button" id="resetBtn" class="px-5 py-2.5 rounded-xl border hover:bg-gray-50">Reset</button>
-      </div>
-    `);
-    $form.append($actions);
+    formHtml += `
+      <div class="pt-2 flex gap-3">
+        <button type="submit" class="px-5 py-2 bg-green-600 text-white rounded">Register</button>
+        <button type="reset" class="px-5 py-2 border rounded">Reset</button>
+      </div>`;
 
-    // Submit butoon
-    $form.on("submit", function (e) {
-      e.preventDefault();
+    $("#patientForm").html(formHtml);
 
-      let formValues = {};
-      let validAll = true;
-
-      try {
-        $.each(formConfig, (index, field) => {
-          let $element = $("#" + field.id);
-          let value =
-            field.inputType == "checkbox"
-              ? $element.prop("checked")
-              : $element.val() == null
-              ? ""
-              : $element.val().toString().trim();
-
-          if (field.mandatory) {
-            let empty =
-              field.inputType == "checkbox" ? value==null:value=="";
-            if (empty) {
-              alert(field.title + " is required!");
-              validAll = false;
-              return false;
-            }
-          }
-
-          if (field.id == "phone" && value) {
-            let len = field.charLength || 10;
-            let re = new RegExp("^\\d{" + len + "}$");
-            if (re.test(value) == false) {
-              alert("Please enter a valid " + len + "-digit phone number.");
-              validAll = false;
-              return false;
-            }
-          }
-
-          if (field.id == "birthDate" && value) {
-            let today = new Date().toISOString().split("T")[0];
-            if (new Date(value) > new Date(today)) {
-              alert("Birth Date cannot be in the future.");
-              validAll = false;
-              return false;
-            }
-          }
-
-          formValues[field.id] = value;
-        });
-
-        if (validAll == false) return;
-
-        // Local Storage save
-        let allPatients = JSON.parse(localStorage.getItem("patients")) || [];
-        allPatients.push(formValues);
-        localStorage.setItem("patients", JSON.stringify(allPatients));
-
-        // Result display 
-        console.log("Patient Form Submitted & Saved:", formValues);
-        $("#result").text(JSON.stringify(formValues, null, 2));
-        $("#resultWrap").removeClass("hidden");
-        alert("Form submitted & saved successfully!");
-
-        window.location.href="../Html/report.html";
-      } 
-        catch (err) {
-        console.error("Error on patient form submit:", err);
-        alert("Something went wrong, please try again.");
-      }
-    });
-
-    // Reset button
-    $form.on("click", "#resetBtn", function () {
-      let formEl = $form[0];
-      if (formEl) formEl.reset();
-      $("#resultWrap").addClass("hidden");
-      $("#result").text("");
-    });
-
-    //Date Picker Plugin
+    // Activate datepicker
     $(".datepicker").datepicker({
       changeMonth: true,
       changeYear: true,
       yearRange: "1900:+0",
       dateFormat: "yy-mm-dd"
     });
+
+    // Activate country plugin
+    $(".country-select").countrySelect({
+      preferredCountries: ['us', 'in', 'gb']
+    });
+
+    // On form submit
+   $("#patientForm").on("submit", function (e) {
+  e.preventDefault();
+
+  // Collect ALL input values dynamically
+  let user = {};
+  $("#patientForm")
+    .find("input, select, textarea")
+    .each(function () {
+      let field = $(this);
+      let type = field.attr("type");
+      let name = field.attr("name");
+
+      if (!name) return; // skip if no name attribute
+
+      if (type === "radio") {
+        if (field.is(":checked")) {
+          user[name] = field.val();
+        }
+      } else if (type === "checkbox") {
+        user[name] = field.is(":checked");
+      } else {
+        user[name] = field.val();
+      }
+    });
+
+  // Save entire form data into localStorage
+  localStorage.setItem("registeredUser", JSON.stringify(user));
+
+  alert("Registration successful! Redirecting to login...");
+  window.location.href = "../HTML/LoginPage.html"; // redirect
+    });
   }
+});
+<!DOCTYPE html>
+<html lang="en">
+<head> 
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- jQuery Plugin -->
+  <script src="../Plugin/jquery-3.7.1.min 2.js"></script>
+  <script src="../JavaScript/Table.js"></script>
   
+  <!-- Chart Plugin -->
+   <script src="../Plugin/Chart/chart.js"></script> 
+
+   <!-- DataTables Plugin -->
+  <link href="../Plugin/DataTables/datatables.css" rel="stylesheet">
+   <script src="../Plugin/DataTables/datatables.min.js"></script>
+   
+
+</head>
+<body class="bg-gray-100 min-h-screen">
+
+  <header class="bg-blue-500 text-white p-4 flex justify-between items-center">
+    <h1 class="text-xl font-bold">Report</h1>
+    <div>
+      <span id="userInfo" class="mr-4 font-semibold"></span>
+      <span id="sessionTimer" class="mr-4"></span>
+      <button id="logoutBtn" class="bg-red-500 hover:bg-red-600 px-3 py-1 rounded">Logout</button>
+    </div>
+  </header>
+
+  <main class="p-6">
+
+     <!-- Patient Table -->
+ <div class="bg-white p-6 shadow-rounded-lg">
+  <table id="patientTable" class="display w-full"></table>
+ </div>
+
+   <!-- Charts -->
+  <div class="grid grid-cols-2 gap-6">
+    <div  class="bg-white p-4 rounded-xl shadow">
+      <canvas id="bloodChart"></canvas>
+    </div>
+    <div  class="bg-white p-4 rounded-xl shadow">
+      <canvas id="bmiChart"></canvas>
+    </div>
+  </div>
+
+  </main>
+
+</body>
+</html>
+$(document).ready(function() {
+  // Check session
+  let session = JSON.parse(localStorage.getItem('session'));
+
+  if(!session) {
+    alert('Session expired or not logged in!');
+    window.location.href = 'login.html';
+  }
+
+  // Display user info
+  $('#userInfo').text(`Hello, ${session.name}`);
+
+  // Session timer
+  function startSessionTimer() {
+    const interval = setInterval(() => {
+      const now = new Date().getTime();
+      const remaining = session.loginTime + session.expiry - now;
+
+      if(remaining <= 0) {
+        clearInterval(interval);
+        alert('Session expired!');
+        localStorage.removeItem('session');
+        window.location.href = 'login.html';
+      } else {
+        const minutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
+        const seconds = Math.floor((remaining % (1000 * 60)) / 1000);
+        $('#sessionTimer').text(`Session: ${minutes}m ${seconds}s`);
+      }
+    }, 1000);
+  }
+
+  startSessionTimer();
+
+ 
+  // Logout button
+  $('#logoutBtn').click(function() {
+    localStorage.removeItem('session');
+    window.location.href = '../HTML/LoginPage.html';
+  });
+
+   let patients = JSON.parse(localStorage.getItem("registeredUser")) || [];
+
+  if(patients.length==0){
+    $("#patientTable").html('<tr><td>No Data Found</td></tr>');
+    return;
+  }
+    $("#patientTable").DataTable({
+      data:patients,
+      columns:Object.keys(patients[0]).map(key=> ({title:key,data:key})),
+      responsive:true
+    });
+
+    //Calculate Blood Count
+  let typeCount={};
+  patients.forEach(p=> {
+    let group=p.bloodGroup||"Unknown";
+    typeCount[group] =(typeCount[group]||0)+1;
+  });
+
+   //PieChart for Blood Group Distribution
+  let blood=document.getElementById("bloodChart").getContext("2d");
+  window.skillsChartInstance=  new Chart(blood,{
+    type:'pie',
+    data:{
+      labels:Object.keys(typeCount),
+      datasets:[{
+        label:'Blood Group',
+        data:Object.values(typeCount),
+        backgroundColor:['#4a00f7ff','#dd2e2eff','#002f64ff','#00ff2aff','#fbff00ff','#ff1100ff']
+      }]
+    },
+    options:{
+      responsive:true,
+      plugins:{
+        title:{
+          display:true,
+          text:'Blood Group Distribution'
+        }
+      }
+    }
+  });
+
+//calculate Bmi
+  let bmiCategory={"UnderWeight":0,"Normal":0,"OverWeight":0,"Obese":0};
+  patients.forEach(p=>{
+    let h=parseFloat(p.height);
+    let w=parseFloat(p.weight);
+    if(!h|| !w) return;
+
+    let bmi=w/((h/100)**2);  
+    if(bmi<18.5) bmiCategory["UnderWeight"]++;
+    else if(bmi<25) bmiCategory["Normal"]++;
+    else if(bmi<30) bmiCategory["OverWeight"]++;
+    else bmiCategory["Obese"]++;
+  });
+
+  //BarGraph
+    let ctx=document.getElementById("bmiChart").getContext("2d");
+  window.skillsChartInstance=  new Chart(ctx,{
+    type:'bar',
+    data:{
+      labels:Object.keys(bmiCategory),
+      datasets:[{
+        label:'Number of Patients',
+        data:Object.values(bmiCategory),
+        backgroundColor:['#ff5100ff']
+      }]
+    },
+    options:{
+      responsive:true,
+      plugins:{
+        title:{
+          display:true,
+          text:'BMI Categories'
+        },
+        legend:{display:false}
+      }
+    }
+  });
+
 });
