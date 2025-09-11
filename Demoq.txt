@@ -1,68 +1,57 @@
-use SQLTraining;
-Create Schema Chandan3;
+USE SQLTraining;
 
-create table chandan.Movies(
-Movie_ID int identity(1,1) Primary key,
-Movie_Name varchar(100) Not null,
-Movie_Genre varchar(100),
-Movie_Language varchar(100),
-Movie_Release DATE,
-Movie_Duration Int,
-Movie_Rating decimal(2,1) Check (Movie_Rating between 0 and 10),
-isDelete Bit default 0
-);
+-- Insert Movies
+INSERT INTO chandan.Movies (Movie_Name, Movie_Genre, Movie_Language, Movie_Release, Movie_Duration, Movie_Rating)
+VALUES
+('Inception', 'Sci-Fi', 'English', '2010-07-16', 148, 8.8),
+('KGF Chapter 2', 'Action', 'Kannada', '2022-04-14', 168, 9.0),
+('3 Idiots', 'Comedy-Drama', 'Hindi', '2009-12-25', 171, 8.4);
 
-create table  chandan.Theatres(
-Theatre_ID int identity(1,1) Primary Key Not null,
-Theatre_Name varchar(100) Not null,
-Theatre_Location varchar(100),
-Theatre_Rating decimal(2,1) Check(Theatre_Rating between 0 and 10),
-Total_Seats int not null,
-isDelete bit default 0
-);
+-- Insert Theatres
+INSERT INTO chandan.Theatres (Theatre_Name, Theatre_Location, Theatre_Rating, Total_Seats)
+VALUES
+('PVR Orion', 'Bangalore', 9.2, 150),
+('INOX Garuda', 'Bangalore', 8.5, 120),
+('Cinepolis', 'Hyderabad', 8.8, 180);
 
-create table chandan.Movie_Show(
-Show_ID int identity(1,1) Primary key not null,
-Movie_ID int foreign key(Movie_ID) references chandan.Movies(Movie_ID),
-Theatre_ID int foreign key(Theatre_ID) references chandan.Theatres(Theatre_ID),
-Show_Time datetime,
-Show_Price int not null,
-isDelete bit default 0
-);
-create table chandan.Movie_Customers(
-Customer_ID int identity(1,1) Primary key not null,
-username varchar(50),
-password varchar(50),
-customer_email varchar(50),
-phone varchar(15),
-isDelete bit default 0
-);
+-- Insert Movie_Show
+INSERT INTO chandan.Movie_Show (Movie_ID, Theatre_ID, Show_Time, Show_Price)
+VALUES
+(1, 1, '2025-09-11 18:30:00', 250),
+(2, 2, '2025-09-11 21:00:00', 300),
+(3, 3, '2025-09-12 17:00:00', 200);
 
-create table chandan.Show_Seats(
-Seat_ID int identity(1,1) Primary key not null,
-Theatre_ID int foreign key(Theatre_ID) references chandan.Theatres(Theatre_ID),
-Seat_Number varchar(50),
-Seat_Type varchar(50),
-isBooked bit default 0
-);
-create table chandan.Movie_Booking(
-Booking_ID int identity(1,1) Primary key not null,
-Customer_ID int foreign key(Customer_ID) references chandan.Movie_Customers(Customer_ID),
-Show_ID int foreign key(Show_ID) references chandan.Movie_Show(Show_ID),
-Booking_Date datetime,
-Total_Amount decimal(10,2),
-Status varchar(50)
-);
-create table chandan.Booking_Payment(
-Payment_ID int identity(1,1) Primary key not null,
-Booking_ID int foreign key(Booking_ID) references chandan.Movie_Booking(Booking_ID),
-Payment_Type varchar(50),
-Amount decimal(10,2),
-Payment_Time datetime,
-Payment_Status varchar(50)
-);
-create table chandan.Booking_Details(
-Details_ID int identity(1,1) Primary key not null,
-Booking_ID int foreign key(Booking_ID) references chandan.Movie_Booking(Booking_ID),
-Seat_ID int  foreign key(Seat_ID) references chandan.Show_Seats(Seat_ID)
-);
+-- Insert Movie_Customers
+INSERT INTO chandan.Movie_Customers (username, password, customer_email, phone)
+VALUES
+('arjun_k', 'pass123', 'arjun@example.com', '9876543210'),
+('meera_s', 'secret456', 'meera@example.com', '9123456780'),
+('rahul_p', 'test789', 'rahul@example.com', '9988776655');
+
+-- Insert Show_Seats
+INSERT INTO chandan.Show_Seats (Theatre_ID, Seat_Number, Seat_Type)
+VALUES
+(1, 'A1', 'Silver'),
+(1, 'A2', 'Gold'),
+(2, 'B1', 'Platinum');
+
+-- Insert Movie_Booking
+INSERT INTO chandan.Movie_Booking (Customer_ID, Show_ID, Booking_Date, Total_Amount, Status)
+VALUES
+(1, 1, GETDATE(), 500.00, 'Confirmed'),
+(2, 2, GETDATE(), 300.00, 'Pending'),
+(3, 3, GETDATE(), 200.00, 'Cancelled');
+
+-- Insert Booking_Payment
+INSERT INTO chandan.Booking_Payment (Booking_ID, Payment_Type, Amount, Payment_Time, Payment_Status)
+VALUES
+(1, 'Credit Card', 500.00, GETDATE(), 'Success'),
+(2, 'UPI', 300.00, GETDATE(), 'Pending'),
+(3, 'Cash', 200.00, GETDATE(), 'Failed');
+
+-- Insert Booking_Details
+INSERT INTO chandan.Booking_Details (Booking_ID, Seat_ID)
+VALUES
+(1, 1),
+(1, 2),
+(2, 3);
