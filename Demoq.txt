@@ -1,336 +1,68 @@
-$(document).ready(function () {
-  console.log("JS loaded");
+use SQLTraining;
+Create Schema Chandan3;
 
-  // Load JSON
-  $.getJSON("../Json/registration.json", function (data) {
-    console.log("JSON loaded:", data);
-    buildForm(data);
-  }).fail(function (xhr, status, err) {
-    console.error("Failed to load registration.json", err);
-  }); 
+create table chandan.Movies(
+Movie_ID int identity(1,1) Primary key,
+Movie_Name varchar(100) Not null,
+Movie_Genre varchar(100),
+Movie_Language varchar(100),
+Movie_Release DATE,
+Movie_Duration Int,
+Movie_Rating decimal(2,1) Check (Movie_Rating between 0 and 10),
+isDelete Bit default 0
+);
 
-  // Main builder
-  function buildForm(fields) {
-    let formHtml = "";
+create table  chandan.Theatres(
+Theatre_ID int identity(1,1) Primary Key Not null,
+Theatre_Name varchar(100) Not null,
+Theatre_Location varchar(100),
+Theatre_Rating decimal(2,1) Check(Theatre_Rating between 0 and 10),
+Total_Seats int not null,
+isDelete bit default 0
+);
 
-    fields.forEach(function (field) {
-      switch (field.inputType) {
-        case "text":
-        case "tel":
-        case "password":
-        case "number":
-        case "email":
-          formHtml += `
-            <div>
-              <label for="${field.id}" class="block font-medium">${field.title}${field.mandatory ? "*" : ""}</label>
-              <input type="${field.inputType}" id="${field.id}" name="${field.id}"
-                class="border p-2 w-full"
-                ${field.charLength ? `maxlength="${field.charLength}"` : ""}
-                ${field.min ? `min="${field.min}"` : ""}
-                ${field.max ? `max="${field.max}"` : ""}
-                ${field.mandatory ? "required" : ""}
-                ${field.enable == false ? "disabled" : ""} />
-            </div>`;
-          break;
+create table chandan.Movie_Show(
+Show_ID int identity(1,1) Primary key not null,
+Movie_ID int foreign key(Movie_ID) references chandan.Movies(Movie_ID),
+Theatre_ID int foreign key(Theatre_ID) references chandan.Theatres(Theatre_ID),
+Show_Time datetime,
+Show_Price int not null,
+isDelete bit default 0
+);
+create table chandan.Movie_Customers(
+Customer_ID int identity(1,1) Primary key not null,
+username varchar(50),
+password varchar(50),
+customer_email varchar(50),
+phone varchar(15),
+isDelete bit default 0
+);
 
-        case "textarea":
-          formHtml += `
-            <div>
-              <label for="${field.id}" class="block font-medium">${field.title}</label>
-              <textarea id="${field.id}" name="${field.id}" class="border p-2 w-full"
-                ${field.mandatory ? "required" : ""}
-                ${field.enable == false ? "disabled" : ""}></textarea>
-            </div>`;
-          break;
-
-        case "select":
-          let options = field.options.map(opt =>
-            `<option value="${opt.value}">${opt.text}</option>`
-          ).join("");
-          formHtml += `
-            <div>
-              <label for="${field.id}" class="block font-medium">${field.title}${field.mandatory ? "*" : ""}</label>
-              <select id="${field.id}" name="${field.id}" class="border p-2 w-full"
-                ${field.mandatory ? "required" : ""}
-                ${field.enable == false ? "disabled" : ""}>
-                <option value="">Select ${field.title}</option>
-                ${options}
-              </select>
-            </div>`;
-          break;
-
-        case "radio":
-          let radios = field.options.map(opt =>
-            `<label class="mr-4"><input type="radio" name="${field.id}" value="${opt.value}" ${field.mandatory ? "required" : ""}> ${opt.text}</label>`
-          ).join(" ");
-          formHtml += `
-            <div>
-              <span class="block font-medium">${field.title}${field.mandatory ? "*" : ""}</span>
-              ${radios}
-            </div>`;
-          break;
-
-        case "date":
-          formHtml += `
-            <div>
-              <label for="${field.id}" class="block font-medium">${field.title}${field.mandatory ? "*" : ""}</label>
-              <input type="text" id="${field.id}" name="${field.id}" class="datepicker border p-2 w-full"
-                ${field.mandatory ? "required" : ""}
-                ${field.enable == false ? "disabled" : ""} />
-            </div>`; 
-          break;
-
-        case "country":
-          formHtml += `
-            <div>
-              <label for="${field.id}" class="block font-medium">${field.title}${field.mandatory ? "*" : ""}</label>
-              <input type="text" id="${field.id}" name="${field.id}" class="country-select border p-2 w-full"
-                ${field.mandatory ? "required" : ""} 
-                ${field.enable == false ? "disabled" : ""} />
-            </div>`;
-          break;
-
-        case "checkbox":
-          formHtml += `
-            <div class="flex items-center">
-              <input type="checkbox" id="${field.id}" name="${field.id}" class="mr-2"
-                ${field.mandatory ? "required" : ""}
-                ${field.enable == false ? "disabled" : ""} />
-              <label for="${field.id}" class="font-medium">${field.title}${field.mandatory ? "*" : ""}</label>
-            </div>`;
-          break;
-
-        default:
-          console.warn("Unknown input type:", field.inputType);
-      }
-    });
-
-    // Action buttons
-    formHtml += `
-      <div class="pt-2 flex gap-3">
-        <button type="submit" class="px-5 py-2 bg-green-600 text-white rounded">Register</button>
-        <button type="reset" class="px-5 py-2 border rounded">Reset</button>
-      </div>`;
-
-    $("#patientForm").html(formHtml);
-
-    // Activate datepicker
-    $(".datepicker").datepicker({
-      changeMonth: true,
-      changeYear: true,
-      yearRange: "1900:+0",
-      dateFormat: "yy-mm-dd"
-    });
-
-    // Activate country plugin
-    $(".country-select").countrySelect({
-      preferredCountries: ['us', 'in', 'gb']
-    });
-
-    // On form submit
-   $("#patientForm").on("submit", function (e) {
-  e.preventDefault();
-
-  // Collect ALL input values dynamically
-  let user = {};
-  $("#patientForm")
-    .find("input, select, textarea")
-    .each(function () {
-      let field = $(this);
-      let type = field.attr("type");
-      let name = field.attr("name");
-
-      if (!name) return; // skip if no name attribute
-
-      if (type === "radio") {
-        if (field.is(":checked")) {
-          user[name] = field.val();
-        }
-      } else if (type === "checkbox") {
-        user[name] = field.is(":checked");
-      } else {
-        user[name] = field.val();
-      }
-    });
-
-  // Save entire form data into localStorage
-  localStorage.setItem("registeredUser", JSON.stringify(user));
-
-  alert("Registration successful! Redirecting to login...");
-  window.location.href = "../HTML/LoginPage.html"; // redirect
-    });
-  }
-});
-<!DOCTYPE html>
-<html lang="en">
-<head> 
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Dashboard</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <!-- jQuery Plugin -->
-  <script src="../Plugin/jquery-3.7.1.min 2.js"></script>
-  <script src="../JavaScript/Table.js"></script>
-  
-  <!-- Chart Plugin -->
-   <script src="../Plugin/Chart/chart.js"></script> 
-
-   <!-- DataTables Plugin -->
-  <link href="../Plugin/DataTables/datatables.css" rel="stylesheet">
-   <script src="../Plugin/DataTables/datatables.min.js"></script>
-   
-
-</head>
-<body class="bg-gray-100 min-h-screen">
-
-  <header class="bg-blue-500 text-white p-4 flex justify-between items-center">
-    <h1 class="text-xl font-bold">Report</h1>
-    <div>
-      <span id="userInfo" class="mr-4 font-semibold"></span>
-      <span id="sessionTimer" class="mr-4"></span>
-      <button id="logoutBtn" class="bg-red-500 hover:bg-red-600 px-3 py-1 rounded">Logout</button>
-    </div>
-  </header>
-
-  <main class="p-6">
-
-     <!-- Patient Table -->
- <div class="bg-white p-6 shadow-rounded-lg">
-  <table id="patientTable" class="display w-full"></table>
- </div>
-
-   <!-- Charts -->
-  <div class="grid grid-cols-2 gap-6">
-    <div  class="bg-white p-4 rounded-xl shadow">
-      <canvas id="bloodChart"></canvas>
-    </div>
-    <div  class="bg-white p-4 rounded-xl shadow">
-      <canvas id="bmiChart"></canvas>
-    </div>
-  </div>
-
-  </main>
-
-</body>
-</html>
-$(document).ready(function() {
-  // Check session
-  let session = JSON.parse(localStorage.getItem('session'));
-
-  if(!session) {
-    alert('Session expired or not logged in!');
-    window.location.href = 'login.html';
-  }
-
-  // Display user info
-  $('#userInfo').text(`Hello, ${session.name}`);
-
-  // Session timer
-  function startSessionTimer() {
-    const interval = setInterval(() => {
-      const now = new Date().getTime();
-      const remaining = session.loginTime + session.expiry - now;
-
-      if(remaining <= 0) {
-        clearInterval(interval);
-        alert('Session expired!');
-        localStorage.removeItem('session');
-        window.location.href = 'login.html';
-      } else {
-        const minutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
-        const seconds = Math.floor((remaining % (1000 * 60)) / 1000);
-        $('#sessionTimer').text(`Session: ${minutes}m ${seconds}s`);
-      }
-    }, 1000);
-  }
-
-  startSessionTimer();
-
- 
-  // Logout button
-  $('#logoutBtn').click(function() {
-    localStorage.removeItem('session');
-    window.location.href = '../HTML/LoginPage.html';
-  });
-
-   let patients = JSON.parse(localStorage.getItem("registeredUser")) || [];
-
-  if(patients.length==0){
-    $("#patientTable").html('<tr><td>No Data Found</td></tr>');
-    return;
-  }
-    $("#patientTable").DataTable({
-      data:patients,
-      columns:Object.keys(patients[0]).map(key=> ({title:key,data:key})),
-      responsive:true
-    });
-
-    //Calculate Blood Count
-  let typeCount={};
-  patients.forEach(p=> {
-    let group=p.bloodGroup||"Unknown";
-    typeCount[group] =(typeCount[group]||0)+1;
-  });
-
-   //PieChart for Blood Group Distribution
-  let blood=document.getElementById("bloodChart").getContext("2d");
-  window.skillsChartInstance=  new Chart(blood,{
-    type:'pie',
-    data:{
-      labels:Object.keys(typeCount),
-      datasets:[{
-        label:'Blood Group',
-        data:Object.values(typeCount),
-        backgroundColor:['#4a00f7ff','#dd2e2eff','#002f64ff','#00ff2aff','#fbff00ff','#ff1100ff']
-      }]
-    },
-    options:{
-      responsive:true,
-      plugins:{
-        title:{
-          display:true,
-          text:'Blood Group Distribution'
-        }
-      }
-    }
-  });
-
-//calculate Bmi
-  let bmiCategory={"UnderWeight":0,"Normal":0,"OverWeight":0,"Obese":0};
-  patients.forEach(p=>{
-    let h=parseFloat(p.height);
-    let w=parseFloat(p.weight);
-    if(!h|| !w) return;
-
-    let bmi=w/((h/100)**2);  
-    if(bmi<18.5) bmiCategory["UnderWeight"]++;
-    else if(bmi<25) bmiCategory["Normal"]++;
-    else if(bmi<30) bmiCategory["OverWeight"]++;
-    else bmiCategory["Obese"]++;
-  });
-
-  //BarGraph
-    let ctx=document.getElementById("bmiChart").getContext("2d");
-  window.skillsChartInstance=  new Chart(ctx,{
-    type:'bar',
-    data:{
-      labels:Object.keys(bmiCategory),
-      datasets:[{
-        label:'Number of Patients',
-        data:Object.values(bmiCategory),
-        backgroundColor:['#ff5100ff']
-      }]
-    },
-    options:{
-      responsive:true,
-      plugins:{
-        title:{
-          display:true,
-          text:'BMI Categories'
-        },
-        legend:{display:false}
-      }
-    }
-  });
-
-});
+create table chandan.Show_Seats(
+Seat_ID int identity(1,1) Primary key not null,
+Theatre_ID int foreign key(Theatre_ID) references chandan.Theatres(Theatre_ID),
+Seat_Number varchar(50),
+Seat_Type varchar(50),
+isBooked bit default 0
+);
+create table chandan.Movie_Booking(
+Booking_ID int identity(1,1) Primary key not null,
+Customer_ID int foreign key(Customer_ID) references chandan.Movie_Customers(Customer_ID),
+Show_ID int foreign key(Show_ID) references chandan.Movie_Show(Show_ID),
+Booking_Date datetime,
+Total_Amount decimal(10,2),
+Status varchar(50)
+);
+create table chandan.Booking_Payment(
+Payment_ID int identity(1,1) Primary key not null,
+Booking_ID int foreign key(Booking_ID) references chandan.Movie_Booking(Booking_ID),
+Payment_Type varchar(50),
+Amount decimal(10,2),
+Payment_Time datetime,
+Payment_Status varchar(50)
+);
+create table chandan.Booking_Details(
+Details_ID int identity(1,1) Primary key not null,
+Booking_ID int foreign key(Booking_ID) references chandan.Movie_Booking(Booking_ID),
+Seat_ID int  foreign key(Seat_ID) references chandan.Show_Seats(Seat_ID)
+);
