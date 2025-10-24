@@ -1,122 +1,505 @@
 $(document).ready(function () {
-  let formConfig = [];
- 
-  // load data
-  $.getJSON("../plugin/data.json", function (data) {
-    formConfig = data;
-    buildForm(); 
-  }).fail(function () {
-    console.error("Failed to load JSON file");
-  });
- 
-  let $form = $("#ecommerceForm");
- 
-  function createDiv(type = "smart-input") {
-    return $("<div>").addClass(type);
-  }
- 
-  function createFields(field) {
-    return $("<label>")
-      .attr("for", field.id)
-      .text(field.title + (field.mandatory ? " *" : ""));
-  }
- 
-  function commonAttributes($input, field) {
-    $input.attr("id", field.id);
-    if (!field.enable) $input.prop("disabled", true);
-    if (field.mandatory) $input.prop("required", true);
-    return $input;
-  }
- 
-  function createFormField(field) {
-    let $div, $input, $label;
- 
-    switch (field.inputType) {
-      case "select":
-        $div = createDiv();
-        $input = $("<select>").addClass("peer");
-        $input.append(
-          $("<option>").val("").text("Select ").prop("selected", true).prop("disabled", true).prop("hidden", true)
-        );
-        $.each(field.options, (_, opt) => {
-          $input.append($("<option>").val(opt.value).text(opt.text));
-        });
-        $label = createFields(field);
-        $div.append($input).append($label);
-        break;
- 
-      case "textarea":
-        $div = createDiv();
-        $input = $("<textarea>").addClass("peer").attr("placeholder", " ");
-        $label = createFields(field);
-        $div.append($input).append($label);
-        break;
- 
-      case "checkbox":
-        $div = createDiv("flex items-center space-x-2");
-        $input = $("<input>").attr("type", "checkbox").addClass("w-5 h-5");
-        $label = createFields(field).removeClass().addClass("text-gray-700 font-medium");
-        $div.append($input).append($label);
-        break;
- 
-      case "text":
-      case "tel":
-      case "password":
-        $div = createDiv();
-        $input = $("<input>").attr("type", field.inputType).addClass("peer").attr("placeholder", " ");
-        if (field.charLength) $input.attr("maxlength", field.charLength);
-        $label = createFields(field);
-        $div.append($input).append($label);
-        break;
- 
-      default:
-        console.warn("Unknown input type:", field.inputType);
-        return;
-    }
- 
-    $input = commonAttributes($input, field);
-    $form.find("button[type=submit]").before($div);
-  }
- 
-  function buildForm() {
-    $.each(formConfig, (_, field) => createFormField(field));
- 
-    $form.on("submit", function (e) {
-      e.preventDefault();
- 
-      let formValues = {};
-      let validAll = true;
- 
-      $.each(formConfig, (_, field) => {
-        let $element = $("#" + field.id);
-        let value = field.inputType === "checkbox" ? $element.prop("checked") : $element.val();
- 
-        if (field.mandatory && !value) {
-          alert(field.title + " is required!");
-          validAll = false;
-          return false;
-        }
- 
-        if (field.id == "phoneNum" && value) {
-          if (!/^[0-9]+$/.test(value)) {
-            alert("Please enter a valid 10-digit phone number.");
-            validAll = false;
-            return false;
-          }
-        }
- 
-        formValues[field.id] = value;
-      });
- 
-      if (!validAll) return;
- 
-      if (formValues.password !== formValues.confirmPassword) {
-        alert("Passwords do not match. Please try with the same password.");
-        return;
-      }
- 
-      console.log("Form Submitted:", formValues);
-      alert("Form submitted successfully!");
-    });
-  }
+  console.log("Panel Dashboard Loaded");
+
+  $("#navDashboard").click(() => showDashboard());
+  $("#navAssessments").click(() => showAssessments());
+  $("#navEvaluations").click(() => showEvaluations());
+  $("#navCandidates").click(() => getCandidatesByPanel());
+  $("#logoutBtn").click(() => logoutCandidate());
+
+
+  // default load dashboard
+  showDashboard();
 });
+
+function showDashboard() {
+  $("#dashboardSection").show();
+  $("#assessmentSection, #evaluationSection").hide();
+
+  ajaxPost("panelDashboardData", {}, function (res) {
+    $("#dashboardSection").html(`
+      <h2 class="text-2xl font-bold mb-4">Overview</h2>
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
+        <div class="bg-white p-4 rounded shadow text-center">
+          <p class="text-gray-600">Assigned Candidates</p>
+          <h3 class="text-3xl text-blue-600 font-bold">${res.assigned || 0}</h3>
+        </div>
+        <div class="bg-white p-4 rounded shadow text-center">
+          <p class="text-gray-600">Pending Evaluations</p>
+          <h3 class="text-3xl text-blue-600 font-bold">${res.pending || 0}</h3>
+        </div>
+        <div class="bg-white p-4 rounded shadow text-center">
+          <p class="text-gray-600">Completed Tests</p>
+          <h3 class="text-3xl text-blue-600 font-bold">${res.completed || 0}</h3>
+        </div>
+        <div class="bg-white p-4 rounded shadow text-center">
+          <p class="text-gray-600">Total Assessments</p>
+          <h3 class="text-3xl text-blue-600 font-bold">${res.assessments || 0}</h3>
+        </div>
+      </div>
+    `);
+  });
+}
+function showAssessments() {
+  $("#dashboardSection, #candidateSection").hide();
+  $("#assessmentSection").show().html("<div class='text-center text-gray-500 py-10'>Loading assessments...</div>");
+
+  const userId = sessionStorage.getItem("user_id");
+
+  ajaxPost("getAssessmentsByUser", { user_id: userId }, function (res) {
+    var html = "";
+    html += "<div class='flex justify-between mb-4'>";
+    html += "<h2 class='text-2xl font-bold'>My Assessments</h2>";
+    html += "<button id='btnAddAssessment' class='bg-blue-600 text-white px-4 py-2 rounded'>+ Add Assessment</button>";
+    html += "</div>";
+
+    html += "<table id='assessmentTable' class='display nowrap min-w-full bg-white rounded shadow'>";
+    html += "<thead class='bg-gray-100'><tr>";
+    html += "<th>Name</th><th>Subject</th><th>Duration</th><th>Total Marks</th><th>Passing</th><th>Actions</th>";
+    html += "</tr></thead><tbody>";
+
+    if (res.status == "success" && Array.isArray(res.assessments) && res.assessments.length > 0) {
+      res.assessments.forEach(function (a) {
+        html += "<tr>";
+        html += "<td>" + a.assessment_name + "</td>";
+        html += "<td>" + a.subject + "</td>";
+        html += "<td>" + a.duration_min + " mins</td>";
+        html += "<td>" + a.total_marks + "</td>";
+        html += "<td>" + a.passing_marks + "</td>";
+        html += "<td class='space-x-1'>";
+        html += "<button class='editAssessment bg-yellow-500 text-white px-2 py-1 rounded' data-id='" + a.assessment_id + "'>Edit</button>";
+        html += "<button class='deleteAssessment bg-red-600 text-white px-2 py-1 rounded' data-id='" + a.assessment_id + "'>Delete</button>";
+        html += "<button class='manageQuestions bg-green-600 text-white px-2 py-1 rounded' data-id='" + a.assessment_id + "'>+ Question</button>";
+        html += "</td></tr>";
+
+      });
+    }
+
+    html += "</tbody></table>";
+
+    $("#assessmentSection").html(html);
+
+    // DataTable
+    $("#assessmentTable").DataTable({
+      pageLength: 5,
+      responsive: true,
+      destroy: true
+    });
+  });
+}
+$(document).on("click", "#btnAddAssessment", function () {
+  $("#assessmentModalTitle").text("Add New Assessment");
+  $("#addAssessmentForm")[0].reset();
+  $("#assessment_id").val("");
+  $("#addAssessmentModal").removeClass("hidden");
+});
+
+$("#cancelAddAssessment").click(() => $("#addAssessmentModal").addClass("hidden"));
+
+$("#addAssessmentForm").submit(function (e) {
+  e.preventDefault();
+
+  var data = {
+    assessment_id: $("#assessment_id").val(),
+    assessment_name: $("#assessment_name").val(),
+    subject: $("#subject").val(),
+    description: $("#description").val(),
+    duration_min: $("#duration_min").val(),
+    total_marks: $("#total_marks").val(),
+    passing_marks: $("#passing_marks").val(),
+    user_id: sessionStorage.getItem("user_id")
+  };
+
+  var action = data.assessment_id && data.assessment_id !== "" ? "updateAssessment" : "addAssessment";
+
+  console.log("form data" + data);
+  ajaxPost(action, data, function (res) {
+    alert(res.message);
+    if (res.status == "success") {
+      $("#addAssessmentModal").addClass("hidden");
+      showAssessments();
+    }
+  });
+});
+$(document).on("click", ".editAssessment", function () {
+  const id = $(this).data("id");
+  console.log("Editing Assessment ID:", id);
+
+  ajaxPost("getAssessmentById", { assessment_id: id }, function (res) {
+    console.log("Fetch response:", res);
+
+    if (res.status == "success" && res.assessment) {
+      const a = res.assessment;
+      $("#assessment_id").val(a.assessment_id);
+      $("#assessment_name").val(a.assessment_name);
+      $("#subject").val(a.subject);
+      $("#description").val(a.description);
+      $("#duration_min").val(a.duration_min);
+      $("#total_marks").val(a.total_marks);
+      $("#passing_marks").val(a.passing_marks);
+      $("#assessmentModalTitle").text("Edit Assessment");
+      $("#addAssessmentModal").removeClass("hidden");
+    } else {
+      alert(res.message || "Failed to fetch assessment details");
+    }
+  });
+});
+
+$(document).on("click", ".deleteAssessment", function () {
+  if (!confirm("Are you sure you want to delete this assessment?")) return;
+  var id = $(this).data("id");
+
+  ajaxPost("deleteAssessment", { assessment_id: id }, function (res) {
+    alert(res.message);
+    if (res.status == "success") showAssessments();
+  });
+});
+
+
+//Show Questions
+$(document).on("click", ".manageQuestions", function () {
+  const aid = $(this).data("id");
+  $("#mq_assessment_id").val(aid);
+  $("#manageQuestionsModal").removeClass("hidden");
+
+  ajaxPost("getQuestionsByAssessment", { assessment_id: aid }, function (res) {
+    if (res.status == "success" && Array.isArray(res.questions)) {
+      let rows = "";
+      res.questions.forEach((q, i) => {
+        rows += `
+          <tr class="border-b">
+            <td class="px-2 py-1">${i + 1}</td>
+            <td class="px-2 py-1">${q.question_text}</td>
+            <td class="px-2 py-1 text-sm">
+              A) ${q.option_a}<br>
+              B) ${q.option_b}<br>
+              C) ${q.option_c}<br>
+              D) ${q.option_d}
+            </td>
+            <td class="px-2 py-1 text-blue-600 font-semibold">${q.correct_answer}</td>
+            <td class="px-2 py-1">${q.marks}</td>
+            <td class="px-2 py-1">
+              <button class="editQuestion bg-yellow-500 text-white px-2 py-1 rounded"
+                data-assessment="${aid}" data-q='${btoa(JSON.stringify(q))}'>Edit</button>
+              <button class="deleteQuestion bg-red-600 text-white px-2 py-1 rounded ml-1"
+                data-assessment="${aid}" data-id="${q.question_id}">Delete</button>
+            </td>
+          </tr>`;
+      });
+      $("#questionTableBody").html(rows);
+    } else {
+      $("#questionTableBody").html("<tr><td colspan='6' class='text-center text-gray-500 py-4'>No questions yet</td></tr>");
+    }
+  });
+});
+
+$("#closeQuestionModal").click(() => $("#manageQuestionsModal").addClass("hidden"));
+
+
+//Add Questions
+$("#btnAddQuestion").click(() => {
+  $("#add_q_assessment_id").val($("#mq_assessment_id").val());
+  $("#addQuestionForm")[0].reset();
+  $("#addQuestionModal").removeClass("hidden");
+});
+
+$("#cancelAddQuestion").click(() => $("#addQuestionModal").addClass("hidden"));
+
+$("#addQuestionForm").submit(function (e) {
+  e.preventDefault();
+
+  const data = {
+    assessment_id: $("#add_q_assessment_id").val(),
+    question_text: $("#add_q_text").val(),
+    option_a: $("#add_opt_a").val(),
+    option_b: $("#add_opt_b").val(),
+    option_c: $("#add_opt_c").val(),
+    option_d: $("#add_opt_d").val(),
+    correct_answer: $("#add_correct_answer").val(),
+    marks: $("#add_marks").val()
+  };
+
+  ajaxPost("addQuestion", data, function (res) {
+    alert(res.message);
+    if (res.status == "success") {
+      $("#addQuestionModal").addClass("hidden");
+      ajaxPost("getQuestionsByAssessment", { assessment_id: data.assessment_id }, function (res2) {
+        renderQuestions(res2);
+      });
+    }
+  });
+});
+
+//Edit Question
+$(document).on("click", ".editQuestion", function () {
+  const q = JSON.parse(atob($(this).data("q")));
+  $("#edit_q_assessment_id").val($(this).data("assessment"));
+  $("#edit_q_id").val(q.question_id);
+  $("#edit_q_text").val(q.question_text);
+  $("#edit_opt_a").val(q.option_a);
+  $("#edit_opt_b").val(q.option_b);
+  $("#edit_opt_c").val(q.option_c);
+  $("#edit_opt_d").val(q.option_d);
+  $("#edit_correct_answer").val(q.correct_answer);
+  $("#edit_marks").val(q.marks);
+  $("#editQuestionModal").removeClass("hidden");
+});
+
+$("#cancelEditQuestion").click(() => $("#editQuestionModal").addClass("hidden"));
+
+$("#editQuestionForm").submit(function (e) {
+  e.preventDefault();
+
+  const data = {
+    assessment_id: $("#edit_q_assessment_id").val(),
+    question_id: $("#edit_q_id").val(),
+    question_text: $("#edit_q_text").val(),
+    option_a: $("#edit_opt_a").val(),
+    option_b: $("#edit_opt_b").val(),
+    option_c: $("#edit_opt_c").val(),
+    option_d: $("#edit_opt_d").val(),
+    correct_answer: $("#edit_correct_answer").val(),
+    marks: $("#edit_marks").val()
+  };
+
+  ajaxPost("updateQuestion", data, function (res) {
+    alert(res.message);
+    if (res.status == "success") {
+      $("#editQuestionModal").addClass("hidden");
+      ajaxPost("getQuestionsByAssessment", { assessment_id: data.assessment_id }, function (res2) {
+        renderQuestions(res2);
+      });
+    }
+  });
+});
+
+
+//Delete Questions
+$(document).on("click", ".deleteQuestion", function () {
+  if (!confirm("Are you sure you want to delete this question?")) return;
+
+  const data = {
+    assessment_id: $(this).data("assessment"),
+    question_id: $(this).data("id")
+  };
+
+  ajaxPost("deleteQuestion", data, function (res) {
+    alert(res.message);
+    if (res.status == "success") {
+      ajaxPost("getQuestionsByAssessment", { assessment_id: data.assessment_id }, function (res2) {
+        renderQuestions(res2);
+      });
+    }
+  });
+});
+
+//Helper function
+function renderQuestions(res) {
+  if (res.status == "success" && Array.isArray(res.questions)) {
+    let rows = "";
+    res.questions.forEach((q, i) => {
+      rows += `
+        <tr class="border-b">
+          <td class="px-2 py-1">${i + 1}</td>
+          <td class="px-2 py-1">${q.question_text}</td>
+          <td class="px-2 py-1 text-sm">
+            A) ${q.option_a}<br>B) ${q.option_b}<br>C) ${q.option_c}<br>D) ${q.option_d}
+          </td>
+          <td class="px-2 py-1 text-blue-600 font-semibold">${q.correct_answer}</td>
+          <td class="px-2 py-1">${q.marks}</td>
+          <td class="px-2 py-1">
+            <button class="editQuestion bg-yellow-500 text-white px-2 py-1 rounded"
+              data-assessment="${$("#mq_assessment_id").val()}" data-q='${btoa(JSON.stringify(q))}'>Edit</button>
+            <button class="deleteQuestion bg-red-600 text-white px-2 py-1 rounded ml-1"
+              data-assessment="${$("#mq_assessment_id").val()}" data-id="${q.question_id}">Delete</button>
+          </td>
+        </tr>`;
+    });
+    $("#questionTableBody").html(rows);
+  } else {
+    $("#questionTableBody").html("<tr><td colspan='6' class='text-center text-gray-500 py-4'>No questions yet</td></tr>");
+  }
+}
+
+
+function getCandidatesByPanel() {
+  $("#dashboardSection, #assessmentSection, #evaluationSection").hide();
+  $("#candidateSection").show().html(`
+    <div class='text-center text-gray-500 py-10'>Loading candidates...</div>
+  `);
+
+  ajaxPost("getCandidateByPanel", {}, function (res) {
+    console.log("Candidate Response:", res);
+
+    if (res.status == "success" && Array.isArray(res.candidates) && res.candidates.length > 0) {
+      let rows = "";
+
+      res.candidates.forEach(c => {
+        rows += `
+          <tr>
+            <td>${c.user_id}</td>
+            <td>${c.full_name}</td>
+            <td>${c.email}</td>
+            <td>${c.phone_no}</td>
+            <td>${c.panel_name}</td>
+          </tr>`;
+      });
+
+      $("#candidateSection").html(`
+        <h2 class="text-2xl font-bold mb-4">Assigned Candidates</h2>
+        <table id="candidateTable" class="min-w-full bg-white rounded shadow">
+          <thead>
+            <tr class="bg-gray-100">
+              <th>Candidate ID</th>
+              <th>Full Name</th>
+              <th>Email</th>
+              <th>Phone</th>
+              <th>Panel</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      `);
+    } else {
+      $("#candidateSection").html(`
+        <div class="text-center text-gray-500 py-10">No candidates assigned to you.</div>
+      `);
+    }
+  });
+}
+
+function showEvaluations() {
+   $("#dashboardSection, #assessmentSection").hide();
+  $("#evaluationSection").show().html("<div class='text-center text-gray-500 py-10'>Loading assigned candidates...</div>");
+
+  ajaxPost("getCandidateSubmissions", {}, function (res) {
+    if (res.status == "success" && Array.isArray(res.submittedList) && res.submittedList.length > 0) {
+      let html = `
+        <h2 class="text-2xl font-bold mb-4">Submitted Assessments</h2>
+        <table class="min-w-full bg-white rounded shadow">
+          <thead class="bg-gray-100">
+            <tr>
+              <th class="px-4 py-2 text-left">Candidate</th>
+              <th class="px-4 py-2 text-left">Assessment</th>
+              <th class="px-4 py-2 text-left">Submitted Date</th>
+              <th class="px-4 py-2 text-left">Status</th>
+              <th class="px-4 py-2 text-left">Action</th>
+            </tr>
+          </thead>
+          <tbody>`;
+
+      res.submittedList.forEach((s) => {
+        html += `
+          <tr class="border-b hover:bg-gray-50">
+            <td class="px-4 py-2">${s.full_name}</td>
+            <td class="px-4 py-2">${s.assessment_name}</td>
+            <td class="px-4 py-2">${s.assigned_date}</td>
+            <td class="px-4 py-2 text-blue-600 font-semibold">${s.status}</td>
+            <td class="px-4 py-2">
+              <button class="viewAnswers bg-green-600 text-white px-3 py-1 rounded"
+                      data-caid="${s.candidate_assessment_id}">
+                Evaluate
+              </button>
+            </td>
+          </tr>`;
+      });
+
+      html += "</tbody></table>";
+      $("#evaluationSection").html(html);
+    } else {
+      $("#evaluationSection").html(
+        "<div class='text-center text-gray-500 py-10'>No submitted tests found.</div>"
+      );
+    }
+  });
+}
+$(document).on("click", ".viewAnswers", function () {
+  console.log("viewAnswer button clicked");
+  const candidateAssessmentId = $(this).data("caid");
+  $("#manualEvalTitle").text("Loading");
+  //Fetch Question and answer
+  ajaxPost("evaluateCandidateAssessment", { candidate_assessment_id: candidateAssessmentId }, function (res) {
+    if (res.status  == "success") {
+        console.log("viewAnswer button success");
+
+      $("#manualEvaluateModal").removeClass("hidden");
+      $("#manualEvalTitle").text("Manual Evaluation - " + res.assessment_name);
+
+      let html = "";
+      res.question.forEach((q, i) => {
+        const candidateAns = res.answers.find(a => a.questionId == q.questionId);
+        const selected = candidateAns ? candidateAns.selectedAnswer : "Not Attempted";
+
+        html += `
+          <div class="border rounded p-4 bg-white shadow-sm">
+            <h3 class="font-semibold text-gray-800 mb-2">${i + 1}. ${q.question}</h3>
+            <p><b>Candidate Answer:</b> <span class="text-blue-700">${selected}</span></p>
+            <p><b>Correct Answer:</b> <span class="text-green-700">${q.correctAnswer}</span></p>
+
+            <div class="flex gap-4 mt-2">
+              <label><input type="radio" name="q${q.questionId}" value="correct">Correct</label>
+              <label><input type="radio" name="q${q.questionId}" value="wrong">Wrong</label>
+            </div>
+
+            <input type="text" id="remark_q${q.questionId}" placeholder="Remark (optional)"
+              class="mt-2 w-full border rounded p-2 text-sm" />
+          </div>
+        `;
+      });
+
+      $("#manualEvalContent").html(html);
+
+      // Handle submit
+      $("#submitManualEvaluation").off("click").on("click", function () {
+        const panelRemarks = $("#panelRemarks").val();
+        const evaluated = [];
+
+        res.questions.forEach((q) => {
+          const result = $(`input[name='q${q.questionId}']:checked`).val();
+          const remark = $(`#remark_q${q.questionId}`).val() || "";
+          const isCorrect = result == "correct";
+
+          evaluated.push({
+            questionId: q.questionId,
+            selectedAnswer: res.answers.find(a => a.questionId == q.questionId)?.selectedAnswer || "",
+            correctAnswer: q.correctAnswer,
+            isCorrect: isCorrect,
+            remark: remark,
+            marks: isCorrect ? q.marks : 0
+          });
+        });
+
+        const payload = {
+          candidate_assessment_id: candidateAssessmentId,
+          evaluation: JSON.stringify(evaluated),
+          panelRemarks: panelRemarks
+        };
+
+        ajaxPost("submitManualEvaluation", payload, function (r) {
+          if (r.status == "success") {
+            alert("Evaluation saved successfully!");
+            $("#manualEvaluateModal").addClass("hidden");
+            showEvaluationSection(); // refresh
+          } else {
+            alert(r.message || "Error saving evaluation.");
+          }
+        });
+      });
+    } else {
+      alert(res.message || "Unable to load candidate answers.");
+    }
+  });
+});
+
+ $("#manualEvaluateModal").fadeIn(200);
+  $("#manualEvaluateModal").fadeOut(200);
+$("#closeManualEval").click(function () {
+  $("#manualEvaluateModal").addClass("hidden");
+  $("#manualEvalContent").empty();
+});
+
+// logout
+function logoutCandidate() {
+  sessionStorage.clear();
+  window.location.href = "index.html";
+}
