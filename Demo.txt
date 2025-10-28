@@ -1,505 +1,410 @@
-$(document).ready(function () {
-  console.log("Panel Dashboard Loaded");
-
-  $("#navDashboard").click(() => showDashboard());
-  $("#navAssessments").click(() => showAssessments());
-  $("#navEvaluations").click(() => showEvaluations());
-  $("#navCandidates").click(() => getCandidatesByPanel());
-  $("#logoutBtn").click(() => logoutCandidate());
-
-
-  // default load dashboard
-  showDashboard();
+let notyf = new Notyf({
+  duration: 2500,
+  position: { x: "right", y: "top" },
+  types: [
+    { type: "success", background: "#16a34a", icon: false },
+    { type: "error", background: "#dc2626", icon: false },
+  ],
 });
 
-function showDashboard() {
-  $("#dashboardSection").show();
-  $("#assessmentSection, #evaluationSection").hide();
+let currentPage = 1;
+let questionsPerPage = 5;
+let allQuestions = [];
+let candidateAnswers = [];
+let candidateAssessmentId = null;
 
-  ajaxPost("panelDashboardData", {}, function (res) {
-    $("#dashboardSection").html(`
-      <h2 class="text-2xl font-bold mb-4">Overview</h2>
-      <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
-        <div class="bg-white p-4 rounded shadow text-center">
-          <p class="text-gray-600">Assigned Candidates</p>
-          <h3 class="text-3xl text-blue-600 font-bold">${res.assigned || 0}</h3>
-        </div>
-        <div class="bg-white p-4 rounded shadow text-center">
-          <p class="text-gray-600">Pending Evaluations</p>
-          <h3 class="text-3xl text-blue-600 font-bold">${res.pending || 0}</h3>
-        </div>
-        <div class="bg-white p-4 rounded shadow text-center">
-          <p class="text-gray-600">Completed Tests</p>
-          <h3 class="text-3xl text-blue-600 font-bold">${res.completed || 0}</h3>
-        </div>
-        <div class="bg-white p-4 rounded shadow text-center">
-          <p class="text-gray-600">Total Assessments</p>
-          <h3 class="text-3xl text-blue-600 font-bold">${res.assessments || 0}</h3>
-        </div>
-      </div>
-    `);
+// Store user's evaluation choices
+let evaluationChoices = {};
+let evaluationRemarks = {};
+
+$(document).ready(function() {
+  getUserDetails();
+  
+  let urlParams = new URLSearchParams(window.location.search);
+  candidateAssessmentId = urlParams.get('caid');
+  
+  if (candidateAssessmentId==null) {
+    notyf.error("No assessment ID found");
+    setTimeout(function() {
+      window.location.href = "panelDashboard.html";
+    }, 1500);
+    return;
+  }
+  
+  loadEvaluationData();
+  
+  $("#backBtn, #cancelBtn").click(function() {
+    window.location.href = "panelDashboard.html";
+  });
+  
+  $("#submitEvaluation").click(function() {
+    submitEvaluation();
+  });
+});
+
+function loadEvaluationData() {
+  ajaxPost("evaluateCandidateAssessment", { candidate_assessment_id: candidateAssessmentId }, function(res) {
+    if (res.status == "success") {
+      allQuestions = res.question || [];
+      candidateAnswers = res.answers || [];
+      
+      // Initialize evaluation choices
+      for (let i = 0; i < allQuestions.length; i++) {
+        let q = allQuestions[i];
+        let candidateAns = null;
+        
+        for (let j = 0; j < candidateAnswers.length; j++) {
+          if (candidateAnswers[j].questionId == q.questionId) {
+            candidateAns = candidateAnswers[j];
+            break;
+          }
+        }
+        
+        let selected = candidateAns ? candidateAns.selectedAnswer : "";
+        let isCorrect = selected.toUpperCase() == q.correctAnswer.toUpperCase();
+        
+        evaluationChoices[q.questionId] = isCorrect ? "correct" : "wrong";
+        evaluationRemarks[q.questionId] = "";
+      }
+      
+      $("#assessmentTitle").text(res.assessment_name || "Assessment");
+      
+      renderPage();
+      setupPagination();
+    } else {
+      notyf.error(res.message || "Unable to load answers");
+      setTimeout(function() {
+        window.location.href = "panelDashboard.html";
+      }, 1500);
+    }
   });
 }
-function showAssessments() {
-  $("#dashboardSection, #candidateSection").hide();
-  $("#assessmentSection").show().html("<div class='text-center text-gray-500 py-10'>Loading assessments...</div>");
 
-  const userId = sessionStorage.getItem("user_id");
-
-  ajaxPost("getAssessmentsByUser", { user_id: userId }, function (res) {
-    var html = "";
-    html += "<div class='flex justify-between mb-4'>";
-    html += "<h2 class='text-2xl font-bold'>My Assessments</h2>";
-    html += "<button id='btnAddAssessment' class='bg-blue-600 text-white px-4 py-2 rounded'>+ Add Assessment</button>";
-    html += "</div>";
-
-    html += "<table id='assessmentTable' class='display nowrap min-w-full bg-white rounded shadow'>";
-    html += "<thead class='bg-gray-100'><tr>";
-    html += "<th>Name</th><th>Subject</th><th>Duration</th><th>Total Marks</th><th>Passing</th><th>Actions</th>";
-    html += "</tr></thead><tbody>";
-
-    if (res.status == "success" && Array.isArray(res.assessments) && res.assessments.length > 0) {
-      res.assessments.forEach(function (a) {
-        html += "<tr>";
-        html += "<td>" + a.assessment_name + "</td>";
-        html += "<td>" + a.subject + "</td>";
-        html += "<td>" + a.duration_min + " mins</td>";
-        html += "<td>" + a.total_marks + "</td>";
-        html += "<td>" + a.passing_marks + "</td>";
-        html += "<td class='space-x-1'>";
-        html += "<button class='editAssessment bg-yellow-500 text-white px-2 py-1 rounded' data-id='" + a.assessment_id + "'>Edit</button>";
-        html += "<button class='deleteAssessment bg-red-600 text-white px-2 py-1 rounded' data-id='" + a.assessment_id + "'>Delete</button>";
-        html += "<button class='manageQuestions bg-green-600 text-white px-2 py-1 rounded' data-id='" + a.assessment_id + "'>+ Question</button>";
-        html += "</td></tr>";
-
-      });
+function renderPage() {
+  // Save current page
+  saveCurrentPageChoices();
+  
+  let start = (currentPage - 1) * questionsPerPage;
+  let end = start + questionsPerPage;
+  let pageQuestions = allQuestions.slice(start, end);
+  
+  let html = "";
+  
+  for (let i = 0; i < pageQuestions.length; i++) {
+    let q = pageQuestions[i];
+    let actualIdx = start + i;
+    let candidateAns = null;
+    
+    for (let j = 0; j < candidateAnswers.length; j++) {
+      if (candidateAnswers[j].questionId == q.questionId) {
+        candidateAns = candidateAnswers[j];
+        break;
+      }
     }
+    
+    let selected = candidateAns ? candidateAns.selectedAnswer : "Not Attempted";
+    
+    html += createQuestionCard(q, selected, actualIdx);
+  }
+  
+  $("#questionsContainer").html(html);
+  
+  // Restore choices for this page
+  restorePageChoices();
+  
+  // Add change listeners
+  $('input[type="radio"]').on('change', function() {
+    updateTotalMarks();
+  });
+  
+  $('input[type="text"]').on('input', function() {
+    let qId = $(this).data('qid');
+    evaluationRemarks[qId] = $(this).val();
+  });
+  
+  updateTotalMarks();
+}
 
-    html += "</tbody></table>";
-
-    $("#assessmentSection").html(html);
-
-    // DataTable
-    $("#assessmentTable").DataTable({
-      pageLength: 5,
-      responsive: true,
-      destroy: true
-    });
+function saveCurrentPageChoices() {
+  // Save radio button choices
+  $('input[type="radio"]:checked').each(function() {
+    let name = $(this).attr('name');
+    let qId = name.replace('q', '');
+    evaluationChoices[qId] = $(this).val();
+  });
+  
+  // Save remarks
+  $('input[type="text"]').each(function() {
+    let qId = $(this).data('qid');
+    evaluationRemarks[qId] = $(this).val();
   });
 }
-$(document).on("click", "#btnAddAssessment", function () {
-  $("#assessmentModalTitle").text("Add New Assessment");
-  $("#addAssessmentForm")[0].reset();
-  $("#assessment_id").val("");
-  $("#addAssessmentModal").removeClass("hidden");
-});
 
-$("#cancelAddAssessment").click(() => $("#addAssessmentModal").addClass("hidden"));
-
-$("#addAssessmentForm").submit(function (e) {
-  e.preventDefault();
-
-  var data = {
-    assessment_id: $("#assessment_id").val(),
-    assessment_name: $("#assessment_name").val(),
-    subject: $("#subject").val(),
-    description: $("#description").val(),
-    duration_min: $("#duration_min").val(),
-    total_marks: $("#total_marks").val(),
-    passing_marks: $("#passing_marks").val(),
-    user_id: sessionStorage.getItem("user_id")
-  };
-
-  var action = data.assessment_id && data.assessment_id !== "" ? "updateAssessment" : "addAssessment";
-
-  console.log("form data" + data);
-  ajaxPost(action, data, function (res) {
-    alert(res.message);
-    if (res.status == "success") {
-      $("#addAssessmentModal").addClass("hidden");
-      showAssessments();
-    }
-  });
-});
-$(document).on("click", ".editAssessment", function () {
-  const id = $(this).data("id");
-  console.log("Editing Assessment ID:", id);
-
-  ajaxPost("getAssessmentById", { assessment_id: id }, function (res) {
-    console.log("Fetch response:", res);
-
-    if (res.status == "success" && res.assessment) {
-      const a = res.assessment;
-      $("#assessment_id").val(a.assessment_id);
-      $("#assessment_name").val(a.assessment_name);
-      $("#subject").val(a.subject);
-      $("#description").val(a.description);
-      $("#duration_min").val(a.duration_min);
-      $("#total_marks").val(a.total_marks);
-      $("#passing_marks").val(a.passing_marks);
-      $("#assessmentModalTitle").text("Edit Assessment");
-      $("#addAssessmentModal").removeClass("hidden");
-    } else {
-      alert(res.message || "Failed to fetch assessment details");
-    }
-  });
-});
-
-$(document).on("click", ".deleteAssessment", function () {
-  if (!confirm("Are you sure you want to delete this assessment?")) return;
-  var id = $(this).data("id");
-
-  ajaxPost("deleteAssessment", { assessment_id: id }, function (res) {
-    alert(res.message);
-    if (res.status == "success") showAssessments();
-  });
-});
-
-
-//Show Questions
-$(document).on("click", ".manageQuestions", function () {
-  const aid = $(this).data("id");
-  $("#mq_assessment_id").val(aid);
-  $("#manageQuestionsModal").removeClass("hidden");
-
-  ajaxPost("getQuestionsByAssessment", { assessment_id: aid }, function (res) {
-    if (res.status == "success" && Array.isArray(res.questions)) {
-      let rows = "";
-      res.questions.forEach((q, i) => {
-        rows += `
-          <tr class="border-b">
-            <td class="px-2 py-1">${i + 1}</td>
-            <td class="px-2 py-1">${q.question_text}</td>
-            <td class="px-2 py-1 text-sm">
-              A) ${q.option_a}<br>
-              B) ${q.option_b}<br>
-              C) ${q.option_c}<br>
-              D) ${q.option_d}
-            </td>
-            <td class="px-2 py-1 text-blue-600 font-semibold">${q.correct_answer}</td>
-            <td class="px-2 py-1">${q.marks}</td>
-            <td class="px-2 py-1">
-              <button class="editQuestion bg-yellow-500 text-white px-2 py-1 rounded"
-                data-assessment="${aid}" data-q='${btoa(JSON.stringify(q))}'>Edit</button>
-              <button class="deleteQuestion bg-red-600 text-white px-2 py-1 rounded ml-1"
-                data-assessment="${aid}" data-id="${q.question_id}">Delete</button>
-            </td>
-          </tr>`;
-      });
-      $("#questionTableBody").html(rows);
-    } else {
-      $("#questionTableBody").html("<tr><td colspan='6' class='text-center text-gray-500 py-4'>No questions yet</td></tr>");
-    }
-  });
-});
-
-$("#closeQuestionModal").click(() => $("#manageQuestionsModal").addClass("hidden"));
-
-
-//Add Questions
-$("#btnAddQuestion").click(() => {
-  $("#add_q_assessment_id").val($("#mq_assessment_id").val());
-  $("#addQuestionForm")[0].reset();
-  $("#addQuestionModal").removeClass("hidden");
-});
-
-$("#cancelAddQuestion").click(() => $("#addQuestionModal").addClass("hidden"));
-
-$("#addQuestionForm").submit(function (e) {
-  e.preventDefault();
-
-  const data = {
-    assessment_id: $("#add_q_assessment_id").val(),
-    question_text: $("#add_q_text").val(),
-    option_a: $("#add_opt_a").val(),
-    option_b: $("#add_opt_b").val(),
-    option_c: $("#add_opt_c").val(),
-    option_d: $("#add_opt_d").val(),
-    correct_answer: $("#add_correct_answer").val(),
-    marks: $("#add_marks").val()
-  };
-
-  ajaxPost("addQuestion", data, function (res) {
-    alert(res.message);
-    if (res.status == "success") {
-      $("#addQuestionModal").addClass("hidden");
-      ajaxPost("getQuestionsByAssessment", { assessment_id: data.assessment_id }, function (res2) {
-        renderQuestions(res2);
-      });
-    }
-  });
-});
-
-//Edit Question
-$(document).on("click", ".editQuestion", function () {
-  const q = JSON.parse(atob($(this).data("q")));
-  $("#edit_q_assessment_id").val($(this).data("assessment"));
-  $("#edit_q_id").val(q.question_id);
-  $("#edit_q_text").val(q.question_text);
-  $("#edit_opt_a").val(q.option_a);
-  $("#edit_opt_b").val(q.option_b);
-  $("#edit_opt_c").val(q.option_c);
-  $("#edit_opt_d").val(q.option_d);
-  $("#edit_correct_answer").val(q.correct_answer);
-  $("#edit_marks").val(q.marks);
-  $("#editQuestionModal").removeClass("hidden");
-});
-
-$("#cancelEditQuestion").click(() => $("#editQuestionModal").addClass("hidden"));
-
-$("#editQuestionForm").submit(function (e) {
-  e.preventDefault();
-
-  const data = {
-    assessment_id: $("#edit_q_assessment_id").val(),
-    question_id: $("#edit_q_id").val(),
-    question_text: $("#edit_q_text").val(),
-    option_a: $("#edit_opt_a").val(),
-    option_b: $("#edit_opt_b").val(),
-    option_c: $("#edit_opt_c").val(),
-    option_d: $("#edit_opt_d").val(),
-    correct_answer: $("#edit_correct_answer").val(),
-    marks: $("#edit_marks").val()
-  };
-
-  ajaxPost("updateQuestion", data, function (res) {
-    alert(res.message);
-    if (res.status == "success") {
-      $("#editQuestionModal").addClass("hidden");
-      ajaxPost("getQuestionsByAssessment", { assessment_id: data.assessment_id }, function (res2) {
-        renderQuestions(res2);
-      });
-    }
-  });
-});
-
-
-//Delete Questions
-$(document).on("click", ".deleteQuestion", function () {
-  if (!confirm("Are you sure you want to delete this question?")) return;
-
-  const data = {
-    assessment_id: $(this).data("assessment"),
-    question_id: $(this).data("id")
-  };
-
-  ajaxPost("deleteQuestion", data, function (res) {
-    alert(res.message);
-    if (res.status == "success") {
-      ajaxPost("getQuestionsByAssessment", { assessment_id: data.assessment_id }, function (res2) {
-        renderQuestions(res2);
-      });
-    }
-  });
-});
-
-//Helper function
-function renderQuestions(res) {
-  if (res.status == "success" && Array.isArray(res.questions)) {
-    let rows = "";
-    res.questions.forEach((q, i) => {
-      rows += `
-        <tr class="border-b">
-          <td class="px-2 py-1">${i + 1}</td>
-          <td class="px-2 py-1">${q.question_text}</td>
-          <td class="px-2 py-1 text-sm">
-            A) ${q.option_a}<br>B) ${q.option_b}<br>C) ${q.option_c}<br>D) ${q.option_d}
-          </td>
-          <td class="px-2 py-1 text-blue-600 font-semibold">${q.correct_answer}</td>
-          <td class="px-2 py-1">${q.marks}</td>
-          <td class="px-2 py-1">
-            <button class="editQuestion bg-yellow-500 text-white px-2 py-1 rounded"
-              data-assessment="${$("#mq_assessment_id").val()}" data-q='${btoa(JSON.stringify(q))}'>Edit</button>
-            <button class="deleteQuestion bg-red-600 text-white px-2 py-1 rounded ml-1"
-              data-assessment="${$("#mq_assessment_id").val()}" data-id="${q.question_id}">Delete</button>
-          </td>
-        </tr>`;
-    });
-    $("#questionTableBody").html(rows);
-  } else {
-    $("#questionTableBody").html("<tr><td colspan='6' class='text-center text-gray-500 py-4'>No questions yet</td></tr>");
+function restorePageChoices() {
+  // Restore radio button choices
+  for (let qId in evaluationChoices) {
+    let choice = evaluationChoices[qId];
+    $('input[name="q' + qId + '"][value="' + choice + '"]').prop('checked', true);
+  }
+  
+  // Restore remarks
+  for (let qId in evaluationRemarks) {
+    $('input[data-qid="' + qId + '"]').val(evaluationRemarks[qId]);
   }
 }
 
+function createQuestionCard(q, selected, idx) {
+  let html = "<div class='bg-white rounded shadow p-4 mb-4'>";
+  
+  html += "<div class='flex justify-between items-start mb-3'>";
+  html += "<h3 class='font-semibold text-gray-800 text-lg'>";
+  html += (idx + 1) + ". " + q.question;
+  html += "</h3>";
+  html += "<span class='text-sm bg-blue-100 text-blue-700 px-3 py-1 rounded-full font-semibold'>";
+  html += q.marks + " marks";
+  html += "</span>";
+  html += "</div>";
+  
+  html += "<div class='grid grid-cols-2 gap-2 mb-3 text-sm'>";
+  html += "<div class='p-2 border rounded bg-gray-50'><b>A:</b> " + q.optionA + "</div>";
+  html += "<div class='p-2 border rounded bg-gray-50'><b>B:</b> " + q.optionB + "</div>";
+  html += "<div class='p-2 border rounded bg-gray-50'><b>C:</b> " + q.optionC + "</div>";
+  html += "<div class='p-2 border rounded bg-gray-50'><b>D:</b> " + q.optionD + "</div>";
+  html += "</div>";
+  
+  html += "<div class='grid grid-cols-2 gap-4 mb-3 p-3 bg-gray-50 rounded'>";
+  html += "<div>";
+  html += "<span class='text-sm text-gray-600 font-medium'>Candidate:</span>";
+  html += "<div class='text-base font-bold text-blue-600'>" + selected + "</div>";
+  html += "</div>";
+  html += "<div>";
+  html += "<span class='text-sm text-gray-600 font-medium'>Correct:</span>";
+  html += "<div class='text-base font-bold text-green-600'>" + q.correctAnswer + "</div>";
+  html += "</div>";
+  html += "</div>";
+  
+  html += "<div class='flex gap-4 items-center mb-3'>";
+  html += "<label class='flex items-center gap-2 cursor-pointer px-4 py-2 border-2 rounded transition hover:bg-green-50'>";
+  html += "<input type='radio' name='q" + q.questionId + "' value='correct' data-marks='" + q.marks + "' class='w-4 h-4'>";
+  html += "<span class='text-green-600 font-semibold'>✓ Correct</span>";
+  html += "</label>";
+  
+  html += "<label class='flex items-center gap-2 cursor-pointer px-4 py-2 border-2 rounded transition hover:bg-red-50'>";
+  html += "<input type='radio' name='q" + q.questionId + "' value='wrong' data-marks='0' class='w-4 h-4'>";
+  html += "<span class='text-red-600 font-semibold'>✗ Wrong</span>";
+  html += "</label>";
+  html += "</div>";
+  
+  html += "<input type='text' data-qid='" + q.questionId + "' ";
+  html += "placeholder='Add remark (optional)' ";
+  html += "class='w-full border rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400' />";
+  
+  html += "</div>";
+  return html;
+}
 
-function getCandidatesByPanel() {
-  $("#dashboardSection, #assessmentSection, #evaluationSection").hide();
-  $("#candidateSection").show().html(`
-    <div class='text-center text-gray-500 py-10'>Loading candidates...</div>
-  `);
+function updateTotalMarks() {
+  saveCurrentPageChoices();
+  
+  let total = 0;
+  
+  for (let i = 0; i < allQuestions.length; i++) {
+    let q = allQuestions[i];
+    let choice = evaluationChoices[q.questionId];
+    
+    if (choice == 'correct') {
+      total += q.marks;
+    }
+  }
+  
+  $("#calculatedMarks").text(total);
+}
 
-  ajaxPost("getCandidateByPanel", {}, function (res) {
-    console.log("Candidate Response:", res);
-
-    if (res.status == "success" && Array.isArray(res.candidates) && res.candidates.length > 0) {
-      let rows = "";
-
-      res.candidates.forEach(c => {
-        rows += `
-          <tr>
-            <td>${c.user_id}</td>
-            <td>${c.full_name}</td>
-            <td>${c.email}</td>
-            <td>${c.phone_no}</td>
-            <td>${c.panel_name}</td>
-          </tr>`;
-      });
-
-      $("#candidateSection").html(`
-        <h2 class="text-2xl font-bold mb-4">Assigned Candidates</h2>
-        <table id="candidateTable" class="min-w-full bg-white rounded shadow">
-          <thead>
-            <tr class="bg-gray-100">
-              <th>Candidate ID</th>
-              <th>Full Name</th>
-              <th>Email</th>
-              <th>Phone</th>
-              <th>Panel</th>
-            </tr>
-          </thead>
-          <tbody>${rows}</tbody>
-        </table>
-      `);
-    } else {
-      $("#candidateSection").html(`
-        <div class="text-center text-gray-500 py-10">No candidates assigned to you.</div>
-      `);
+function setupPagination() {
+  let totalPages = Math.ceil(allQuestions.length / questionsPerPage);
+  
+  let html = "<div class='flex justify-between items-center'>";
+  
+  html += "<button id='prevPage' class='px-4 py-2 rounded transition ";
+  if (currentPage == 1) {
+    html += "bg-gray-200 text-gray-400 cursor-not-allowed' disabled";
+  } else {
+    html += "bg-gray-600 hover:bg-gray-700 text-white'";
+  }
+  html += ">← Previous</button>";
+  
+  html += "<span class='text-gray-600 font-medium'>";
+  html += "Page " + currentPage + " of " + totalPages;
+  html += "</span>";
+  
+  html += "<button id='nextPage' class='px-4 py-2 rounded transition ";
+  if (currentPage == totalPages) {
+    html += "bg-gray-200 text-gray-400 cursor-not-allowed' disabled";
+  } else {
+    html += "bg-blue-600 hover:bg-blue-700 text-white'";
+  }
+  html += ">Next →</button>";
+  
+  html += "</div>";
+  
+  $("#paginationControls").html(html);
+  
+  $("#prevPage").on("click", function() {
+    if (currentPage > 1) {
+      currentPage--;
+      renderPage();
+      setupPagination();
+      window.scrollTo(0, 0);
+    }
+  });
+  
+  $("#nextPage").on("click", function() {
+    let totalPages = Math.ceil(allQuestions.length / questionsPerPage);
+    if (currentPage < totalPages) {
+      currentPage++;
+      renderPage();
+      setupPagination();
+      window.scrollTo(0, 0);
     }
   });
 }
 
-function showEvaluations() {
-   $("#dashboardSection, #assessmentSection").hide();
-  $("#evaluationSection").show().html("<div class='text-center text-gray-500 py-10'>Loading assigned candidates...</div>");
-
-  ajaxPost("getCandidateSubmissions", {}, function (res) {
-    if (res.status == "success" && Array.isArray(res.submittedList) && res.submittedList.length > 0) {
-      let html = `
-        <h2 class="text-2xl font-bold mb-4">Submitted Assessments</h2>
-        <table class="min-w-full bg-white rounded shadow">
-          <thead class="bg-gray-100">
-            <tr>
-              <th class="px-4 py-2 text-left">Candidate</th>
-              <th class="px-4 py-2 text-left">Assessment</th>
-              <th class="px-4 py-2 text-left">Submitted Date</th>
-              <th class="px-4 py-2 text-left">Status</th>
-              <th class="px-4 py-2 text-left">Action</th>
-            </tr>
-          </thead>
-          <tbody>`;
-
-      res.submittedList.forEach((s) => {
-        html += `
-          <tr class="border-b hover:bg-gray-50">
-            <td class="px-4 py-2">${s.full_name}</td>
-            <td class="px-4 py-2">${s.assessment_name}</td>
-            <td class="px-4 py-2">${s.assigned_date}</td>
-            <td class="px-4 py-2 text-blue-600 font-semibold">${s.status}</td>
-            <td class="px-4 py-2">
-              <button class="viewAnswers bg-green-600 text-white px-3 py-1 rounded"
-                      data-caid="${s.candidate_assessment_id}">
-                Evaluate
-              </button>
-            </td>
-          </tr>`;
-      });
-
-      html += "</tbody></table>";
-      $("#evaluationSection").html(html);
-    } else {
-      $("#evaluationSection").html(
-        "<div class='text-center text-gray-500 py-10'>No submitted tests found.</div>"
-      );
+function submitEvaluation() {
+  // Save current page before submitting
+  saveCurrentPageChoices();
+  
+  let panelRemarks = $("#panelRemarks").val();
+  let evaluated = [];
+  let totalMarksGained = 0;
+  
+  for (let i = 0; i < allQuestions.length; i++) {
+    let q = allQuestions[i];
+    let result = evaluationChoices[q.questionId];
+    let remark = evaluationRemarks[q.questionId] || "";
+    let isCorrect = result == "correct";
+    let marksGained = isCorrect ? q.marks : 0;
+    
+    totalMarksGained += marksGained;
+    
+    let selectedAns = "";
+    for (let j = 0; j < candidateAnswers.length; j++) {
+      if (candidateAnswers[j].questionId == q.questionId) {
+        selectedAns = candidateAnswers[j].selectedAnswer;
+        break;
+      }
     }
-  });
-}
-$(document).on("click", ".viewAnswers", function () {
-  console.log("viewAnswer button clicked");
-  const candidateAssessmentId = $(this).data("caid");
-  $("#manualEvalTitle").text("Loading");
-  //Fetch Question and answer
-  ajaxPost("evaluateCandidateAssessment", { candidate_assessment_id: candidateAssessmentId }, function (res) {
-    if (res.status  == "success") {
-        console.log("viewAnswer button success");
-
-      $("#manualEvaluateModal").removeClass("hidden");
-      $("#manualEvalTitle").text("Manual Evaluation - " + res.assessment_name);
-
-      let html = "";
-      res.question.forEach((q, i) => {
-        const candidateAns = res.answers.find(a => a.questionId == q.questionId);
-        const selected = candidateAns ? candidateAns.selectedAnswer : "Not Attempted";
-
-        html += `
-          <div class="border rounded p-4 bg-white shadow-sm">
-            <h3 class="font-semibold text-gray-800 mb-2">${i + 1}. ${q.question}</h3>
-            <p><b>Candidate Answer:</b> <span class="text-blue-700">${selected}</span></p>
-            <p><b>Correct Answer:</b> <span class="text-green-700">${q.correctAnswer}</span></p>
-
-            <div class="flex gap-4 mt-2">
-              <label><input type="radio" name="q${q.questionId}" value="correct">Correct</label>
-              <label><input type="radio" name="q${q.questionId}" value="wrong">Wrong</label>
-            </div>
-
-            <input type="text" id="remark_q${q.questionId}" placeholder="Remark (optional)"
-              class="mt-2 w-full border rounded p-2 text-sm" />
-          </div>
-        `;
-      });
-
-      $("#manualEvalContent").html(html);
-
-      // Handle submit
-      $("#submitManualEvaluation").off("click").on("click", function () {
-        const panelRemarks = $("#panelRemarks").val();
-        const evaluated = [];
-
-        res.questions.forEach((q) => {
-          const result = $(`input[name='q${q.questionId}']:checked`).val();
-          const remark = $(`#remark_q${q.questionId}`).val() || "";
-          const isCorrect = result == "correct";
-
-          evaluated.push({
-            questionId: q.questionId,
-            selectedAnswer: res.answers.find(a => a.questionId == q.questionId)?.selectedAnswer || "",
-            correctAnswer: q.correctAnswer,
-            isCorrect: isCorrect,
-            remark: remark,
-            marks: isCorrect ? q.marks : 0
+    
+    evaluated.push({
+      questionId: q.questionId,
+      selectedAnswer: selectedAns,
+      correctAnswer: q.correctAnswer,
+      isCorrect: isCorrect,
+      remark: remark,
+      marksGained: marksGained,
+    });
+  }
+  
+  let payload = {
+    candidate_assessment_id: candidateAssessmentId,
+    evaluation: JSON.stringify(evaluated),
+    panelRemarks: panelRemarks,
+  };
+  
+  Swal.fire({
+    title: 'Submit Evaluation?',
+    text: 'Total Marks: ' + totalMarksGained,
+    icon: 'question',
+    showCancelButton: true,
+    confirmButtonColor: '#2563eb',
+    cancelButtonColor: '#6b7280',
+    confirmButtonText: 'Yes, Submit'
+  }).then(function(result) {
+    if (result.isConfirmed) {
+      ajaxPost("submitManualEvaluation", payload, function(r) {
+        if (r.status == "success") {
+          Swal.fire({
+            title: 'Success!',
+            text: 'Evaluation saved successfully!',
+            icon: 'success',
+            confirmButtonColor: '#2563eb'
+          }).then(function() {
+            window.location.href = "panelDashboard.html";
           });
-        });
-
-        const payload = {
-          candidate_assessment_id: candidateAssessmentId,
-          evaluation: JSON.stringify(evaluated),
-          panelRemarks: panelRemarks
-        };
-
-        ajaxPost("submitManualEvaluation", payload, function (r) {
-          if (r.status == "success") {
-            alert("Evaluation saved successfully!");
-            $("#manualEvaluateModal").addClass("hidden");
-            showEvaluationSection(); // refresh
-          } else {
-            alert(r.message || "Error saving evaluation.");
-          }
-        });
+        } else {
+          notyf.error(r.message || "Error saving evaluation");
+        }
       });
-    } else {
-      alert(res.message || "Unable to load candidate answers.");
     }
   });
-});
+}<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Evaluate Answers</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/notyf@3/notyf.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/notyf@3/notyf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+</head>
+<body class="bg-gray-50 min-h-screen">
 
- $("#manualEvaluateModal").fadeIn(200);
-  $("#manualEvaluateModal").fadeOut(200);
-$("#closeManualEval").click(function () {
-  $("#manualEvaluateModal").addClass("hidden");
-  $("#manualEvalContent").empty();
-});
+  <!-- Header -->
+  <header class="bg-black text-white shadow-lg fixed top-0 left-0 w-full z-50">
+    <div class="container mx-auto flex justify-between items-center px-6 py-3">
+      <div class="flex items-center space-x-2">
+        <span class="material-icons text-blue-500 text-3xl">grading</span>
+        <h1 class="text-2xl font-bold">Evaluate Answers</h1>
+      </div>
+      <button id="backBtn" class="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700">
+        ← Back to Dashboard
+      </button>
+    </div>
+  </header>
 
-// logout
-function logoutCandidate() {
-  sessionStorage.clear();
-  window.location.href = "index.html";
-}
+  <!-- Main Content -->
+  <main class="container mx-auto px-6 py-24">
+    <div class="max-w-4xl mx-auto">
+     
+      <!-- Assessment Info Card -->
+      <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+        <h2 id="assessmentTitle" class="text-2xl font-bold text-gray-800 mb-2">Loading...</h2>
+        <div id="totalMarksDisplay" class="bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-blue-500 rounded p-3 flex justify-between items-center">
+          <span class="font-semibold text-gray-700">Total Marks:</span>
+          <span id="calculatedMarks" class="text-blue-700 font-bold text-2xl">0</span>
+        </div>
+      </div>
+
+      <!-- Questions Container -->
+      <div id="questionsContainer" class="space-y-4"></div>
+
+      <!-- Pagination -->
+      <div id="paginationControls" class="bg-white rounded-lg shadow-md p-4 mt-6"></div>
+
+      <!-- Panel Remarks & Submit -->
+      <div class="bg-white rounded-lg shadow-md p-6 mt-6">
+        <label class="block mb-2 text-gray-700 font-semibold">Panel Remarks:</label>
+        <textarea id="panelRemarks"
+          class="w-full border rounded p-3 focus:outline-none focus:ring-2 focus:ring-blue-400"
+          rows="4"
+          placeholder="Add your overall feedback here..."></textarea>
+       
+        <div class="flex justify-end mt-4 gap-3">
+          <button id="cancelBtn" class="bg-gray-400 text-white px-6 py-3 rounded hover:bg-gray-500 transition">
+            Cancel
+          </button>
+          <button id="submitEvaluation" class="bg-blue-600 text-white px-6 py-3 rounded hover:bg-blue-700 transition">
+            Submit Evaluation
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <script src="utils.js"></script>
+  <script src="evaluation.js"></script>
+</body>
+</html>
