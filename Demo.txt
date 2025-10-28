@@ -1,9 +1,34 @@
+// ================== NOTYF + ALERT CONFIG ==================
+const notyf = new Notyf({
+  duration: 2500,
+  position: { x: "right", y: "top" },
+  types: [
+    { type: "success", background: "#16a34a", icon: false },
+    { type: "error", background: "#dc2626", icon: false },
+    { type: "info", background: "#2563eb", icon: false },
+  ],
+});
+
+function showConfirm(title, text, icon = "question", confirmText = "Yes") {
+  return Swal.fire({
+    title,
+    text,
+    icon,
+    showCancelButton: true,
+    confirmButtonColor: "#2563eb",
+    cancelButtonColor: "#6b7280",
+    confirmButtonText: confirmText,
+  });
+}
+
+// ================== PAGE LOAD ==================
 $(document).ready(function () {
   $("#navDashboard").click(() => {
     $("#dashboardSection").show();
     $("#userSection").hide();
     loadDashboard();
   });
+
   $("#navAdmins").click(() => showUserSection("ADMIN"));
   $("#navPanels").click(() => showUserSection("PANEL"));
   $("#navCandidates").click(() => showUserSection("CANDIDATE"));
@@ -13,15 +38,8 @@ $(document).ready(function () {
   $("#userSection").hide();
   loadDashboard();
 });
-function showUserSection(role) {
-  $("#dashboardSection").hide();
-  $("#userSection").show();
-  $("#userSection").html(
-    `<div class='text-center text-gray-500 py-10'>Loading ${role} data...</div>`
-  );
-  loadUserPage(role);
-}
 
+// ================== DASHBOARD ==================
 let completionChartInstance = null;
 let avgTimeChartInstance = null;
 
@@ -31,25 +49,19 @@ function loadDashboard() {
     {},
     function (res) {
       try {
-        const cards = res && res.cards ? res.cards : {};
+        const cards = res?.cards || {};
         $("#cardCandidates").text(cards.candidates ?? "--");
         $("#cardPanels").text(cards.panels ?? "--");
         $("#cardTests").text(cards.tests ?? "--");
         $("#cardCompleted").text(cards.completed ?? "--");
 
-        // Charts
-        if (completionChartInstance) {
-          completionChartInstance.destroy();
-          completionChartInstance = null;
-        }
-        if (avgTimeChartInstance) {
-          avgTimeChartInstance.destroy();
-          avgTimeChartInstance = null;
-        }
+        // Destroy previous charts
+        if (completionChartInstance) completionChartInstance.destroy();
+        if (avgTimeChartInstance) avgTimeChartInstance.destroy();
 
-        // completion chart
+        // Completion Chart
         const compEl = document.getElementById("completionChart");
-        if (compEl && res.completion && Array.isArray(res.completion.labels)) {
+        if (compEl && res.completion?.labels) {
           completionChartInstance = new Chart(compEl, {
             type: "bar",
             data: {
@@ -66,8 +78,9 @@ function loadDashboard() {
           });
         }
 
+        // Avg Time Chart
         const avgEl = document.getElementById("avgTimeChart");
-        if (avgEl && res.avgTime && Array.isArray(res.avgTime.labels)) {
+        if (avgEl && res.avgTime?.labels) {
           avgTimeChartInstance = new Chart(avgEl, {
             type: "line",
             data: {
@@ -86,38 +99,43 @@ function loadDashboard() {
           });
         }
 
-        // recent submissions table
-        const recent = Array.isArray(res.recent) ? res.recent : [];
-        const rows = recent
+        // Recent Submissions Table
+        const rows = (res.recent || [])
           .map(
             (r) => `
-        <tr>
-          <td class="px-3 py-2">${escapeHtml(r.candidate ?? "-")}</td>
-          <td class="px-3 py-2">${escapeHtml(r.test ?? "-")}</td>
-          <td class="px-3 py-2">${escapeHtml(r.status ?? "-")}</td>
-          <td class="px-3 py-2">${escapeHtml(r.score ?? "-")}</td>
-          <td class="px-3 py-2">${escapeHtml(r.timeTaken ?? "-")}</td>
-        </tr>
-      `
+              <tr>
+                <td class="px-3 py-2">${escapeHtml(r.candidate ?? "-")}</td>
+                <td class="px-3 py-2">${escapeHtml(r.test ?? "-")}</td>
+                <td class="px-3 py-2">${escapeHtml(r.status ?? "-")}</td>
+                <td class="px-3 py-2">${escapeHtml(r.score ?? "-")}</td>
+                <td class="px-3 py-2">${escapeHtml(r.timeTaken ?? "-")}</td>
+              </tr>`
           )
           .join("");
-        $("#recentBody").html(rows);
+        $("#recentBody").html(rows || `<tr><td colspan="5">No data</td></tr>`);
       } catch (e) {
         console.error("Error processing dashboard response:", e);
+        notyf.error("Error loading dashboard");
       }
     },
-    function (request, textStatus, errorThrown) {
-      console.error(
-        request.statusText == "Dashboard AJAX error:",
-        textStatus,
-        errorThrown
-      );
+    function () {
+      notyf.error("Unable to fetch dashboard data");
       $("#cardCandidates,#cardPanels,#cardTests,#cardCompleted").text("--");
       $("#recentBody").html(
         `<tr><td colspan="5" class="text-center text-gray-500">Unable to load data</td></tr>`
       );
     }
   );
+}
+
+// ================== USERS SECTION ==================
+function showUserSection(role) {
+  $("#dashboardSection").hide();
+  $("#userSection").show();
+  $("#userSection").html(
+    `<div class='text-center text-gray-500 py-10'>Loading ${role} data...</div>`
+  );
+  loadUserPage(role);
 }
 
 function loadUserPage(role) {
@@ -135,8 +153,7 @@ function loadUserPage(role) {
           <th>Username</th>
           <th>FullName</th>
           <th>Email</th>
-          <th>Phone Number</th>
-         
+          <th>Phone</th>
           ${role == "PANEL" ? "<th>Expertise</th>" : ""}
           <th>Actions</th>
         </tr></thead>
@@ -158,49 +175,39 @@ function buildUserModal(role) {
         <h3 class="text-lg font-semibold mb-3">Add User</h3>
         <form id="userForm" class="space-y-3">
           <input type="text" id="username" placeholder="Username" class="w-full border rounded p-2" required>
-          <input type="text" id="fullName" placeholder="FullName" class="w-full border rounded p-2" required>
+          <input type="text" id="fullName" placeholder="Full Name" class="w-full border rounded p-2" required>
           <input type="email" id="email" placeholder="Email" class="w-full border rounded p-2" required>
           <input type="password" id="password" placeholder="Password" class="w-full border rounded p-2" required>
-          <input type="tel" id="phone" placeholder="Phone Number" class="w-full border rounded p-2"required>
-            ${
-              role == "PANEL"
-                ? `
-              <label class="block text-sm font-medium text-gray-700">Select Expertise (multiple)</label>
-              <select id="expertise" multiple class="w-full border rounded p-2 h-28 focus:ring-2 focus:ring-blue-500">
-                <option value="Java">Java</option>
-                <option value="Python">Python</option>
-                <option value="C++">C++</option>
-                <option value="ReactJS">ReactJS</option>
-                <option value="Spring Boot">Spring Boot</option>
-                <option value="Database (SQL)">Database (SQL)</option>
-                <option value="DevOps">DevOps</option>
-              </select>
-              <p class="text-xs text-gray-500">Hold Ctrl to select multiple</p>
-              `
-                : ""
-            }
+          <input type="tel" id="phone" placeholder="Phone Number" class="w-full border rounded p-2" required>
+          ${
+            role == "PANEL"
+              ? `<label class="text-sm">Expertise</label>
+                <select id="expertise" multiple class="w-full border rounded p-2 h-24">
+                  <option value="Java">Java</option>
+                  <option value="Python">Python</option>
+                  <option value="C++">C++</option>
+                  <option value="Spring Boot">Spring Boot</option>
+                  <option value="Database (SQL)">Database (SQL)</option>
+                </select>`
+              : ""
+          }
           <div class="flex justify-end gap-2">
             <button type="button" id="cancelModal" class="bg-gray-300 px-4 py-2 rounded">Cancel</button>
             <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded">Save</button>
           </div>
         </form>
       </div>
-    </div>
-  `;
+    </div>`;
 }
+
 function loadUsers(role) {
   ajaxPost("getAllUsersByRole", { role: role }, function (res) {
-    if (res.status == "success" && res.users && res.users.length > 0) {
-      // Destroy
+    if (res.status === "success" && res.users?.length > 0) {
       if ($.fn.DataTable.isDataTable("#userTable")) {
         $("#userTable").DataTable().destroy();
       }
 
-      let rows = "";
-      // Build rows
-      res.users.forEach((u) => {
-        rows += buildTableRow(u, role);
-      });
+      let rows = res.users.map((u) => buildTableRow(u, role)).join("");
       $("#userTableBody").html(rows);
 
       $("#userTable").DataTable({
@@ -228,7 +235,7 @@ function bindUserActions(role) {
     ajaxPost(
       "addUser",
       {
-        role: role,
+        role,
         full_name: $("#fullName").val(),
         username: $("#username").val(),
         email: $("#email").val(),
@@ -237,114 +244,44 @@ function bindUserActions(role) {
         expertise: (expertise || []).join(","),
       },
       function (res) {
-        alert(res.message);
-        if (res.status == "success") {
+        notyf.success(res.message || "User added");
+        if (res.status === "success") {
           toggleModal("userModal", false);
           loadUsers(role);
         }
       }
     );
   });
-  $(document).on("click", "#cancelEditModal", function () {
-    toggleModal("editUserModal", false);
-  });
-  // Assign Panel
-  $(document).on("click", ".assignPanel", function () {
-    const candidateId = $(this).data("id");
-    $("#assignCandidateId").val(candidateId);
-    $("#assignPanelSelect").html("<option>Loading...</option>");
-    toggleModal("assignPanelModal", true);
-
-    // Fetch all panels
-    ajaxPost("getAllUsersByRole", { role: "PANEL" }, function (res) {
-      if (res.status == "success" && Array.isArray(res.users)) {
-        const options = res.users
-          .map(
-            (u) =>
-              `<option value="${u.user_id}">${u.full_name} (${
-                u.expertise || "-"
-              })</option>`
-          )
-          .join("");
-        $("#assignPanelSelect").html(options);
-      } else {
-        $("#assignPanelSelect").html(
-          "<option disabled>No panels available</option>"
-        );
-      }
-    });
-  });
-
-  // Cancel modal
-  $("#assignCancel").click(() => toggleModal("assignPanelModal", false));
-
-  // Save panel assignment
-  $("#assignSave").click(() => {
-    const candidateId = $("#assignCandidateId").val();
-    const panelId = $("#assignPanelSelect").val();
-
-    if (!panelId) return alert("Please select a panel member!");
-
-    ajaxPost("assignPanel", { candidateId, panelId }, function (res) {
-      alert(res.message);
-      if (res.status == "success") {
-        toggleModal("assignPanelModal", false);
-        loadUsers("CANDIDATE");
-      }
-    });
-  });
-  $(document).on("click", ".editUser", function () {
-    const userId = $(this).data("id");
-
-    ajaxPost("getUserById", { user_id: userId }, function (res) {
-      if (res.status == "success" && res.user) {
-        const user = res.user;
-
-        $("#editUserId").val(user.user_id);
-        $("#editFullName").val(user.full_name);
-        $("#editEmail").val(user.email);
-        $("#editPhone").val(user.phone_no);
-        $("#editExpertise").val(user.expertise || "");
-        $("#editStatus").prop(
-          "checked",
-          user.status == true || user.status == "true"
-        );
-
-        if (user.role == "PANEL") $("#editExpertiseBlock").show();
-        else $("#editExpertiseBlock").hide();
-
-        toggleModal("editUserModal", true);
-      } else {
-        alert("Unable to fetch user details");
-      }
-    });
-  });
 
   $(document).on("click", ".deleteUser", function () {
-    if (confirm("Delete this user?")) {
-      ajaxPost("deleteUser", { userId: $(this).data("id") }, function (res) {
-        alert(res.message);
-        loadUsers(role);
+    const id = $(this).data("id");
+    showConfirm("Delete User?", "This action cannot be undone.", "warning", "Delete")
+      .then((r) => {
+        if (r.isConfirmed) {
+          ajaxPost("deleteUser", { userId: id }, function (res) {
+            notyf.success(res.message || "Deleted successfully");
+            loadUsers(role);
+          });
+        }
       });
-    }
   });
 }
-//Logout
+
+// ================== LOGOUT ==================
 function logoutUser() {
-  Swal.fire({
-    title: "Logout?",
-    text: "Are you sure?",
-    icon: "question",
-    showCancelButton: true,
-    confirmButtonColor: "#2563eb",
-    confirmButtonText: "Logout",
-  }).then(function(result) {
-    if (result.isConfirmed) {
-      notyf.info("Logging out...");
-      sessionStorage.clear();
-      setTimeout(function() {
-        window.location.href = "index.html";
-      }, 800);
-    }
-  });
+  showConfirm("Logout?", "Are you sure you want to logout?", "question", "Logout")
+    .then((result) => {
+      if (result.isConfirmed) {
+        notyf.open({ type: "info", message: "Logging out..." });
+        ajaxPost("logout", {}, function (res) {
+          if (res.status === "success") {
+            notyf.success(res.message);
+            sessionStorage.clear();
+            setTimeout(() => (window.location.href = "index.html"), 800);
+          } else {
+            notyf.error(res.message || "Logout failed");
+          }
+        });
+      }
+    });
 }
