@@ -1,0 +1,324 @@
+
+let notyfy = new Notyf({
+  duration: 2000,
+  position: { x: 'right', y: 'top' },
+  types: [
+    { type: 'info', background: '#3b82f6' },
+    { type: 'warning', background: '#f59e0b' },
+    { type: 'error', background: '#dc2626', dismissible: true },
+    { type: 'success', background: '#16a34a' }
+  ]
+});
+function ajaxPost(action, data, successCallback) {
+  $.ajax({
+    url: "MainServlet",
+    method: "POST",
+    data: Object.assign({ action: action }, data),
+    dataType: "json",
+    success: successCallback,
+    error: function(err) {
+      console.error("AJAX Error:", err);
+      alert("Server Error. Please check logs.");
+    }
+  });
+}
+function ajaxGet(action, data, successCallback) {
+  $.ajax({
+    url: "MainServlet",
+    method: "GET",
+    data: Object.assign({ action: action }, data),
+    dataType: "json",
+    success: successCallback,
+    error: function(err) {
+      console.error("AJAX Error:", err);
+      alert("Server Error. Please check logs.");
+    }
+  });
+}
+//Logout
+function logoutUser() {
+  Swal.fire({
+    title: "Logout?",
+    text: "Are you sure?",
+    icon: "question",
+    showCancelButton: true,
+    confirmButtonColor: "#2563eb",
+    confirmButtonText: "Logout",
+  }).then(function(result) {
+    if (result.isConfirmed) {
+		notyf.open({
+		  type: 'info',
+		  message: 'Logging out...'
+		});
+      sessionStorage.clear();
+      setTimeout(function() {
+        window.location.href = "index.html";
+      }, 800);
+    }
+  });
+}
+
+ // Escape HTML to prevent XSS
+ function escapeHtml(text) {
+   if (!text) return "";
+   const map = {
+     '&': '&amp;',
+     '<': '&lt;',
+     '>': '&gt;',
+     '"': '&quot;',
+     "'": '&#039;'
+   };
+   return text.toString().replace(/[&<>"']/g, function(m) { return map[m]; });
+ }
+
+// Toggle modal visibility
+function toggleModal(modalId, show) {
+  if (show) {
+    $("#" + modalId).removeClass("hidden");
+  } else {
+    $("#" + modalId).addClass("hidden");
+  }
+}
+
+// Format date
+function formatDate(dateString) {
+  if (!dateString) return "-";
+  const date = new Date(dateString);
+  return date.toLocaleDateString() + " " + date.toLocaleTimeString();
+}
+
+// Validate email
+function isValidEmail(email) {
+  const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return regex.test(email);
+}
+
+// Validate phone number (10 digits)
+function isValidPhone(phone) {
+  const regex = /^[0-9]{10}$/;
+  return regex.test(phone);
+}
+
+// Show loading overlay
+function showLoading(message) {
+  Notiflix.Loading.circle(message || 'Loading...');
+}
+
+// Hide loading overlay
+function hideLoading() {
+  Notiflix.Loading.remove();
+}
+
+// Success notification
+function showSuccess(message) {
+  Notiflix.Notify.success(message);
+}
+
+// Error notification
+function showError(message) {
+  Notiflix.Notify.failure(message);
+}
+
+// Warning notification
+function showWarning(message) {
+  Notiflix.Notify.warning(message);
+}
+
+// Info notification
+function showInfo(message) {
+  Notiflix.Notify.info(message);
+}
+
+// Confirm dialog with SweetAlert
+function showConfirmDialog(title, message, onConfirm) {
+  Swal.fire({
+    title: title,
+    text: message,
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonColor: '#3085d6',
+    cancelButtonColor: '#d33',
+    confirmButtonText: 'Yes, proceed!'
+  }).then((result) => {
+    if (result.isConfirmed && typeof onConfirm == 'function') {
+      onConfirm();
+    }
+  });
+}
+
+// Session check
+function checkSession() {
+  const userId = sessionStorage.getItem('userId');
+  if (!userId) {
+    window.location.href = "index.html";
+    return false;
+  }
+  return true;
+}
+
+// Get session data
+function getSessionData(key) {
+  return sessionStorage.getItem(key);
+}
+
+// Set session data
+function setSessionData(key, value) {
+  sessionStorage.setItem(key, value);
+}
+
+// Clear session
+function clearSession() {
+  sessionStorage.clear();
+}
+
+// Debounce function for search/input
+function debounce(func, wait) {
+  let timeout;
+  return function executedFunction(...args) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
+}
+
+// function buildTableRow(user, role) {
+//   let html = "<tr>";
+//   html += "<td>" + (user.username || "-") + "</td>";
+//   html += "<td>" + (user.full_name || "-") + "</td>";
+//   html += "<td>" + (user.email || "-") + "</td>";
+//   html += "<td>" + (user.phone_no || "-") + "</td>";
+
+//   if (role == "PANEL") {
+//     html += "<td>" + (user.expertise || "-") + "</td>";
+//   }
+
+//   html += `<td class="text-center">`;
+//   if (role == "CANDIDATE") {
+//     html += `
+//       <button class="assignPanel bg-indigo-600 text-white px-2 py-1 rounded"
+//               data-id="${user.user_id}">
+//         Assign Panel
+//       </button>
+//     `;
+//   }
+
+//   html += `
+//     <button class="editUser bg-yellow-500 text-white px-2 py-1 rounded ml-1"
+//             data-id="${user.user_id}">
+//       Edit
+//     </button>
+//     <button class="deleteUser bg-red-600 text-white px-2 py-1 rounded ml-1"
+//             data-id="${user.user_id}">
+//       Delete
+//     </button>
+//   `;
+
+//   html += "</td></tr>";
+//   return html;
+// }
+
+function getUserDetails(){
+	ajaxGet("getUserDetails",{},
+		function(res){
+			if(res.status=="success"){
+				$("#userFullName").text(`Hi, ${res.fullName} (${res.role})`);
+				console.log(res.fullName)
+			}
+			else{
+				Swal.fire({
+					title:"Session expired",
+					text:"Please Log in again",
+					icon:"warning",
+					confirmButtonColor:"#2563eb",
+				}).then(()=>
+					(window.location.href="index.html"));
+			}
+		});
+}
+
+
+//Assessment Utils
+let AssessmentUtils = {
+  showTable: function(assessments) {
+    let html = "<div class='flex justify-between mb-4'>";
+    html += "<h2 class='text-2xl font-bold'>My Assessments</h2>";
+    html += "<button id='btnAddAssessment' class='bg-blue-600 text-white px-4 py-2 rounded'>+ Add Assessment</button>";
+    html += "</div>";
+    html += "<table id='assessmentTable' class='display nowrap min-w-full bg-white rounded shadow'>";
+    html += "<thead class='bg-gray-100'><tr>";
+    html += "<th>Name</th><th>Subject</th><th>Duration</th><th>Total Marks</th><th>Passing</th><th>Actions</th>";
+    html += "</tr></thead><tbody>";
+
+    if (assessments && assessments.length > 0) {
+      for (let i = 0; i < assessments.length; i++) {
+        let a = assessments[i];
+        html += "<tr>";
+        html += "<td>" + a.assessment_name + "</td>";
+        html += "<td>" + a.subject + "</td>";
+        html += "<td>" + a.duration_minutes + " mins</td>";
+        html += "<td>" + a.total_marks + "</td>";
+        html += "<td>" + a.passing_marks + "</td>";
+        html += "<td class='space-x-1'>";
+        html += "<button class='editAssessment bg-yellow-500 text-white px-2 py-1 rounded' data-id='" + a.assessment_id + "'>Edit</button>";
+        html += "<button class='deleteAssessment bg-red-600 text-white px-2 py-1 rounded' data-id='" + a.assessment_id + "'>Delete</button>";
+        html += "<button class='manageQuestions bg-green-600 text-white px-2 py-1 rounded' data-id='" + a.assessment_id + "'>+ Question</button>";
+        html += "</td></tr>";
+      }
+    }
+
+    html += "</tbody></table>";
+    $("#assessmentSection").html(html);
+    $("#assessmentTable").DataTable({ pageLength: 5, responsive: true, destroy: true });
+  },
+
+  renderQuestions: function(questions, assessmentId) {
+    let rows = "";
+    if (questions && questions.length > 0) {
+      for (let i = 0; i < questions.length; i++) {
+        let q = questions[i];
+        rows += "<tr class='border-b'>";
+        rows += "<td class='px-2 py-1'>" + (i + 1) + "</td>";
+        rows += "<td class='px-2 py-1'>" + q.question_text + "</td>";
+        rows += "<td class='px-2 py-1 text-sm'>";
+        rows += "A) " + q.option_a + "<br>B) " + q.option_b + "<br>";
+        rows += "C) " + q.option_c + "<br>D) " + q.option_d;
+        rows += "</td>";
+        rows += "<td class='px-2 py-1 text-blue-600 font-semibold'>" + q.correct_answer + "</td>";
+        rows += "<td class='px-2 py-1'>" + q.marks + "</td>";
+        rows += "<td class='px-2 py-1'>";
+        rows += "<button class='editQuestion bg-yellow-500 text-white px-2 py-1 rounded'";
+        rows += " data-assessment='" + assessmentId + "'";
+        rows += " data-qid='" + q.question_id + "'";
+        rows += " data-qtext='" + q.question_text + "'";
+        rows += " data-oa='" + q.option_a + "'";
+        rows += " data-ob='" + q.option_b + "'";
+        rows += " data-oc='" + q.option_c + "'";
+        rows += " data-od='" + q.option_d + "'";
+        rows += " data-correct='" + q.correct_answer + "'";
+        rows += " data-marks='" + q.marks + "'>Edit</button>";
+        rows += "<button class='deleteQuestion bg-red-600 text-white px-2 py-1 rounded ml-1'";
+        rows += " data-assessment='" + assessmentId + "' data-id='" + q.question_id + "'>Delete</button>";
+        rows += "</td></tr>";
+      }
+    } else {
+      rows = "<tr><td colspan='6' class='text-center text-gray-500 py-4'>No questions yet</td></tr>";
+    }
+    $("#questionTableBody").html(rows);
+  }
+};
+
+
+// Dashboard Utilities
+
+let DashboardUtils = {
+  renderCard: function(title, value) {
+    let html = "<div class='bg-white p-4 rounded shadow text-center hover:shadow-md transition'>";
+    html += "<p class='text-gray-600'>" + title + "</p>";
+    html += "<h3 class='text-3xl text-blue-600 font-bold'>" + value + "</h3>";
+    html += "</div>";
+    return html;
+  }
+};
