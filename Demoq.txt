@@ -1,574 +1,345 @@
-package com.recruitement.servlet;
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Recruitment Admin Panel</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-import java.io.IOException;
+    <link
+      href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css"
+      rel="stylesheet"
+    />
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 
-import javax.servlet.ServletException;
-import javax.servlet.annotation.WebServlet;
-import javax.servlet.http.HttpServlet;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-import javax.servlet.http.HttpSession;
+    <!-- Replace Chart.js with ApexCharts -->
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
 
-import com.google.gson.Gson;
-import com.google.gson.JsonObject;
-import com.recruitement.dao.AssessmentDAOImpl;
-import com.recruitement.dao.CandidatesDAOImpl;
-import com.recruitement.dao.UserDAOImpl;
-import com.recruitement.model.AssessmentModel;
-import com.recruitement.model.QuestionModel;
-import com.recruitement.service.AssessmentService;
-import com.recruitement.service.AssessmentServiceImpl;
-import com.recruitement.service.CandidatesService;
-import com.recruitement.service.CandidatesServiceImpl;
-import com.recruitement.service.DashboardService;
-import com.recruitement.service.DashboardServiceImpl;
-import com.recruitement.service.DashboardService;
-import com.recruitement.service.DashboardServiceImpl;
-import com.recruitement.service.ResultService;
-import com.recruitement.service.ResultServiceImpl;
-import com.recruitement.service.UserService;
-import com.recruitement.service.UserServiceImpl;
+    <link
+      rel="stylesheet"
+      href="https://cdn.datatables.net/1.13.7/css/jquery.dataTables.min.css"
+    />
+    <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
+    <link
+      href="https://fonts.googleapis.com/icon?family=Material+Icons"
+      rel="stylesheet"
+    />
 
-@WebServlet("/MainServlet")
-public class MainServlet extends HttpServlet {
-    private static final long serialVersionUID = 1L;
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/notyf@3/notyf.min.css"
+    />
+    <script src="https://cdn.jsdelivr.net/npm/notyf@3/notyf.min.js"></script>
 
-    private UserService userService;
-    private AssessmentService assessmentService;
-    private CandidatesService candidateService;
-    private ResultService resultService;
-     private DashboardService dashboardService;
 
-    @Override
-    public void init() throws ServletException {
-        System.out.println("MainServlet initialized");
-        userService = new UserServiceImpl(new UserDAOImpl());
-        assessmentService=new AssessmentServiceImpl(new AssessmentDAOImpl());
-        candidateService=new CandidatesServiceImpl();
-        resultService=new ResultServiceImpl();
-        dashboardService=new DashboardServiceImpl();
-    }
+    <link
+      rel="stylesheet"
+      href="https://cdn.datatables.net/buttons/2.4.2/css/buttons.dataTables.min.css"
+    />
+    <script src="https://cdn.datatables.net/buttons/2.4.2/js/dataTables.buttons.min.js"></script>
 
-    @Override
-    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
-    	
-    	doPost(req, resp);
-    }
-    @Override
-    protected void doPost(HttpServletRequest request, HttpServletResponse response)
-            throws ServletException, IOException {
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/pdfmake.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/vfs_fonts.js"></script>
+    <script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.html5.min.js"></script>
+    <script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.print.min.js"></script>
+    .
+  </head>
+  <body class="bg-gray-50 min-h-screen flex flex-col">
+    <!-- Header -->
+    <header class="bg-black shadow-md fixed top-0 left-0 w-full z-50">
+      <div
+        class="container mx-auto flex justify-between items-center px-6 py-3"
+      >
+        <div class="flex items-center space-x-2">
+          <span class="material-icons text-white text-3xl">group_work</span>
+          <h1 class="text-2xl font-bold text-white tracking-tight">
+            SkillBridge
+          </h1>
+        </div>
 
-        response.setContentType("application/json");
-//        response.setCharacterEncoding("UTF 8");
+        <!-- Navigation -->
+        <nav class="flex items-center space-x-6 text-white font-medium">
+          <button
+            id="navDashboard"
+            class="flex items-center gap-1 hover:text-blue-400 transition"
+          >
+            <span class="material-icons text-white">dashboard</span> Dashboard
+          </button>
+          <button
+            id="navAdmins"
+            class="flex items-center gap-1 hover:text-blue-400 transition"
+          >
+            <span class="material-icons text-white">supervisor_account</span>
+            Admins
+          </button>
+          <button
+            id="navPanels"
+            class="flex items-center gap-1 hover:text-blue-400 transition"
+          >
+            <span class="material-icons text-white">groups</span> Panels
+          </button>
+          <button
+            id="navCandidates"
+            class="flex items-center gap-1 hover:text-blue-400 transition"
+          >
+            <span class="material-icons text-white">person</span> Candidates
+          </button>
+        </nav>
 
-        Gson gson = new Gson();
-        String action = request.getParameter("action");
-        System.out.println("Received action: " +  action);
+        <!-- Logout -->
+        <button
+          id="logoutBtn"
+          class="flex items-center gap-1 bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition"
+        >
+          <span class="material-icons">logout</span> Logout
+        </button>
+      </div>
+    </header>
 
-        JsonObject jsonResponse = new JsonObject();
-        HttpSession session=request.getSession(false);
-        System.out.println("recieved action"+action);
-        
-        if(!"login".equals(action)) {
-        	if(session==null || session.getAttribute("userId")==null) {
-        		jsonResponse.addProperty("status","error");
-        		jsonResponse.addProperty("message","Session expired. Please login again");
-        		response.getWriter().write(jsonResponse.toString());
-        		return;
-        	}
-        }
+    <!-- Main -->
+    <main class="flex-1 container mx-auto px-6 py-24 space-y-8">
+      <!-- Dashboard-->
+      <section id="dashboardSection">
+        <!-- Cards -->
+        <div class="grid grid-cols-1 my-10 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div
+            id="cardCandidatesBox"
+            class="bg-white shadow rounded-lg p-5 text-center cursor-pointer hover:shadow-lg transition"
+          >
+            <span class="material-icons text-blue-600 text-4xl mb-2"
+              >people</span
+            >
+            <p class="text-gray-500">Candidates</p>
+            <p id="cardCandidates" class="text-3xl font-bold text-blue-700">
+              0
+            </p>
+          </div>
+          <div
+            id="cardPanelsBox"
+            class="bg-white shadow rounded-lg p-5 text-center cursor-pointer hover:shadow-lg transition"
+          >
+            <span class="material-icons text-green-600 text-4xl mb-2"
+              >person_outline</span
+            >
+            <p class="text-gray-500">Panels</p>
+            <p id="cardPanels" class="text-3xl font-bold text-green-700">0</p>
+          </div>
+          <div class="bg-white shadow rounded-lg p-5 text-center">
+            <span class="material-icons text-purple-600 text-4xl mb-2"
+              >assignment</span
+            >
+            <p class="text-gray-500">Tests</p>
+            <p id="cardTests" class="text-3xl font-bold text-purple-700">0</p>
+          </div>
+          <div class="bg-white shadow rounded-lg p-5 text-center">
+            <span class="material-icons text-orange-600 text-4xl mb-2"
+              >check_circle</span
+            >
+            <p class="text-gray-500">Completed</p>
+            <p id="cardCompleted" class="text-3xl font-bold text-orange-700">
+              0
+            </p>
+          </div>
+        </div>
 
-        try {
-            switch (action) {
+        <!-- Charts adn Graphs-->
+        <div class="grid my-10 grid-cols-1 lg:grid-cols-2 gap-6">
+          <div class="bg-white p-4 rounded-lg shadow">
+            <h3 class="text-lg font-semibold mb-2 flex items-center gap-1">
+              <span class="material-icons text-blue-600">bar_chart</span> Test
+              Completion Status
+            </h3>
+            <div id="completionChart"></div>
+          </div>
+          <div class="bg-white p-4 rounded-lg shadow">
+            <h3 class="text-lg font-semibold mb-2 flex items-center gap-1">
+              <span class="material-icons text-green-600">show_chart</span>
+              Average Time per Test (mins)
+            </h3>
+            <div id="avgTimeChart"></div>
+          </div>
+        </div>
 
-               
-                case "login": {
-                    String username = request.getParameter("username");
-                    String password = request.getParameter("password");
-                    
-                    JsonObject userResponse=userService.userLogin(username, password);
-                    
-                    if("success".equals(userResponse.get("status").getAsString()) ) {
-                    	session=request.getSession(true);
-                    	session.setAttribute("username", userResponse.get("username").getAsString());
-                    	session.setAttribute("fullName", userResponse.get("full_name").getAsString());
-                    	session.setAttribute("role", userResponse.get("role").getAsString());
-                    	session.setAttribute("userId", userResponse.get("userId").getAsInt());
-                    	System.out.println("session created for userid "+session.getAttribute("userId"));
-                    }
-                    response.getWriter().write(userResponse.toString());
-                    System.out.println(userResponse);
-                    break;
-                }
-                case "getUserDetails":{
-                	JsonObject res=new JsonObject();
-                	if(session==null || session.getAttribute("userId")==null) {
-                		res.addProperty("status", "error");
-                		res.addProperty("message", "No active sesssion");
-                	}
-                	else {
-                		res.addProperty("status", "success");
-                		res.addProperty("userId", (int)session.getAttribute("userId"));
-                		res.addProperty("username", (String)session.getAttribute("username"));
-                		res.addProperty("fullName", (String)session.getAttribute("fullName"));
-                		res.addProperty("role", (String)session.getAttribute("role"));
-                		
-                	}
-                	response.getWriter().write(res.toString());
-                	break;
-                }
+        <!-- LeaderBoard-->
+        <div class="bg-white rounded-lg shadow p-4">
+          <div class="flex justify-between items-center mb-3">
+            <h3 class="text-lg font-semibold flex items-center gap-1">
+              <span class="material-icons text-blue-600">leaderboard</span>
+              LeaderBoard
+            </h3>
+          </div>
+          <div class="overflow-x-auto">
+            <table id="leaderboardTable" class="min-w-full divide-y divide-gray-200">
+              <thead class="bg-gray-100">
+                <tr>
+                  <th
+                    class="px-3 py-2 text-left text-sm font-medium text-gray-600"
+                  >
+                    Candidate
+                  </th>
+                  <th
+                    class="px-3 py-2 text-left text-sm font-medium text-gray-600"
+                  >
+                    Test
+                  </th>
+                  <th
+                    class="px-3 py-2 text-left text-sm font-medium text-gray-600"
+                  >
+                    Status
+                  </th>
+                  <th
+                    class="px-3 py-2 text-left text-sm font-medium text-gray-600"
+                  >
+                    Score
+                  </th>
+                  <th
+                    class="px-3 py-2 text-left text-sm font-medium text-gray-600"
+                  >
+                    Time (mins)
+                  </th>
+                </tr>
+              </thead>
+              <tbody id="recentBody" class="divide-y divide-gray-200"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+      <section id="userSection" class="hidden"></section>
+    </main>
 
-                case "addUser": {
-                    String username = request.getParameter("username");
-                    String fullName = request.getParameter("full_name");
-                    String email = request.getParameter("email");
-                    String password = request.getParameter("password");
-                    String phone = request.getParameter("phone");
-                    String role = request.getParameter("role");
-                    String expertise = request.getParameter("expertise");
+    <style>
+      .dt-button {
+    background-color: #2563eb !important; 
+    color: white
+    !important; border-radius: 0.375rem;
+     padding: 6px 12px; border: none;
+    font-size: 14px;
+   } .dt-button:hover { background-color: #1e40af !important;
+   }
+    </style>
+   
 
-                    JsonObject addResult = userService.addUser(
-                         username,fullName, email, password, phone, expertise, role, true
-                    );
+    <!-- Assign Panel -->
+    <div
+      id="assignPanelModal"
+      class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+    >
+      <div
+        class="bg-white rounded-lg shadow-lg w-96 max-h-[80vh] flex flex-col p-6"
+      >
+        <h3 class="text-xl font-semibold mb-4 text-gray-700">Assign Panel</h3>
+        <input type="hidden" id="assignCandidateId" />
+        <label class="block text-sm mb-2 font-medium text-gray-600"
+          >Select Panel Member</label
+        >
+        <div class="flex-1 overflow-y-auto mb-4">
+          <select
+            id="assignPanelSelect"
+            class="w-full border rounded p-2"
+            size="8"
+          >
+            <option>Loading...</option>
+          </select>
+        </div>
+        <div class="flex justify-end gap-2 border-t pt-4">
+          <button
+            id="assignCancel"
+            class="bg-gray-300 px-4 py-2 rounded hover:bg-gray-400"
+          >
+            Cancel
+          </button>
+          <button
+            id="assignSave"
+            class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+          >
+            Save
+          </button>
+        </div>
+      </div>
+    </div>
 
-                    response.getWriter().write(addResult.toString());
-                    System.out.println(addResult);
-                    break;
-                }
-     
-                case "getAllUsersByRole": {
-                    String role = request.getParameter("role");
-                    JsonObject users = userService.getAllUserByRole(role);
-                    response.getWriter().write(users.toString());
-                    System.out.println(users);
-                    break;
-                }
-                case "assignPanel":{
-                	int candidateId=Integer.parseInt(request.getParameter("candidateId"));
-                	int panelId=Integer.parseInt(request.getParameter("panelId"));
-                	
-                	JsonObject assign=userService.assignPanel(candidateId, panelId);
-                	response.getWriter().write(assign.toString());
-                	break;
-                }
-                case "updateUser": {
-                    int userId = Integer.parseInt(request.getParameter("user_id"));
-                    String fullName = request.getParameter("full_name");
-                    String email = request.getParameter("email");
-                    String phone = request.getParameter("phone_no");
-                    String expertise = request.getParameter("expertise");
+    <!-- Edit User -->
+    <div
+      id="editUserModal"
+      class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+    >
+      <div class="bg-white rounded-lg shadow-lg w-96 p-6">
+        <h3 class="text-xl font-semibold text-gray-800 mb-4">Edit User</h3>
 
-                    JsonObject result = userService.updateUserById(userId, email, fullName, phone, expertise);
-                    response.getWriter().write(result.toString());
-                    break;
-                }
-                case "getUserById": {
-                    int userId = Integer.parseInt(request.getParameter("user_id"));
-                    JsonObject responseObj = userService.getUserById(userId);
-                    System.out.print(response+" getUserById");
-                    response.getWriter().write(responseObj.toString());
-                    break;
-                }
-                case "deleteUser": {
-                    int userId = Integer.parseInt(request.getParameter("userId"));
-                    JsonObject responseObj = userService.deleteUserById(userId);
-                    response.getWriter().write(responseObj.toString());
-                    break;
-                }
-                case "getCandidateByPanel": {
-                    System.out.println("Received action: getCandidateByPanel");
-                    JsonObject resObj = new JsonObject();
+        <form id="editUserForm" class="space-y-3">
+          <input type="hidden" id="editUserId" />
 
-                    if (session == null || session.getAttribute("userId") == null) {
-                        resObj.addProperty("status", "error");
-                        resObj.addProperty("message", "Session expired. Please log in again.");
-                        response.getWriter().write(resObj.toString());
-                        break;
-                    }
+          <div>
+            <label class="block text-sm text-gray-600 mb-1"
+              >Full Name <span class="text-red-500">*</span></label
+            >
+            <input
+              type="text"
+              id="editFullName"
+              class="w-full border rounded p-2"
+              required
+            />
+          </div>
+          <div>
+            <label class="block text-sm text-gray-600 mb-1"
+              >Email <span class="text-red-500">*</span></label
+            >
+            <input
+              type="email"
+              id="editEmail"
+              class="w-full border rounded p-2"
+              required
+            />
+          </div>
+          <div>
+            <label class="block text-sm text-gray-600 mb-1">Phone</label>
+            <input
+              type="tel"
+              id="editPhone"
+              class="w-full border rounded p-2"
+              pattern="[0-9]{10}"
+            />
+          </div>
+          <div id="editExpertiseBlock" class="hidden">
+            <label class="block text-sm text-gray-600 mb-1">Expertise</label>
+            <input
+              type="text"
+              id="editExpertise"
+              class="w-full border rounded p-2"
+              placeholder="E.g., Java, Spring Boot"
+            />
+          </div>
 
-                    int panelId = (int) session.getAttribute("userId");   
-                    System.out.println("panel id"+panelId);
-                    JsonObject responseObj = userService.getCandidatesByPanel(panelId);
-                    response.getWriter().write(responseObj.toString());
-                    break;
-                }
-                case "adminDashboardData": {
-                    JsonObject result = dashboardService.getAdminDashboardData();
-                    response.getWriter().write(result.toString());
-                    break;
-                }
-                case "addAssessment":{
-                	System.out.println("recieved action: addAssessment");
-                	int userId=Integer.parseInt(session.getAttribute("userId").toString());
-                	AssessmentModel a = new AssessmentModel();
-                    a.setAssessmentName(request.getParameter("assessment_name"));
-                    a.setSubject(request.getParameter("subject"));
-                    a.setDescription(request.getParameter("description"));
-                    a.setDurationMin(Integer.parseInt(request.getParameter("duration_minutes")));
-                    a.setTotalMarks(Integer.parseInt(request.getParameter("total_marks")));
-                    a.setPassingMarks(Integer.parseInt(request.getParameter("passing_marks")));
-                    a.setQuestions(request.getParameter("questions")); // JSON string
-                    a.setUserId(userId);
-                    a.setStatus(true);
+          <div class="flex items-center">
+            <input type="checkbox" id="editStatus" class="mr-2" />
+            <label for="editStatus" class="text-sm text-gray-700">Active</label>
+          </div>
 
-                    JsonObject result = assessmentService.addAssessment(a);
-                    response.getWriter().write(result.toString());
-                    break;
-                	
-                		
-                }
-                case "getAssessmentsByUser": {
-                    System.out.println("Received action: getAssessmentsByUser");
-                    int userId = (int) session.getAttribute("userId");
-                    JsonObject responseObj = assessmentService.getAssessmentsByUser(userId);
-                    response.getWriter().write(responseObj.toString());
-                    break;
-                }
-                case "getAssessmentById": {
-                    System.out.println("Received action: getAssessmentById");
-                    int assessmentId = Integer.parseInt(request.getParameter("assessment_id"));
-                    JsonObject result = assessmentService.getAssessmentsById(assessmentId);
-                    response.getWriter().write(result.toString());
-                    break;
-                }
+          <div class="flex justify-end gap-2 pt-2">
+            <button
+              type="button"
+              id="cancelEditModal"
+              class="bg-gray-300 px-4 py-2 rounded hover:bg-gray-400"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+            >
+              Save
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+    <footer class="bg-white text-center py-4 shadow-inner text-gray-500">
+      © 2025 RecruitmentPro - All rights reserved.
+    </footer>
 
-                
-                case "updateAssessment": {
-                    System.out.println("Received action: updateAssessment");
-
-                    int id = Integer.parseInt(request.getParameter("assessment_id"));
-                    System.out.println(id);
-                    String name = request.getParameter("assessment_name");
-                    String subject = request.getParameter("subject");
-                    String desc = request.getParameter("description");
-                    int duration = Integer.parseInt(request.getParameter("duration_minutes"));
-//                    int totalQ = Integer.parseInt(request.getParameter("total_question"));
-                    int totalMarks = Integer.parseInt(request.getParameter("total_marks"));
-                    int passMarks = Integer.parseInt(request.getParameter("passing_marks"));
-
-                    AssessmentModel a = new AssessmentModel();
-                    a.setAssessmentId(id);
-                    a.setAssessmentName(name);
-                    a.setSubject(subject);
-                    a.setDescription(desc);
-                    a.setDurationMin(duration);
-//                    a.setTotalQuestion(totalQ);
-                    a.setTotalMarks(totalMarks);
-                    a.setPassingMarks(passMarks);
-
-                    JsonObject updateResponse = assessmentService.updateAssessment(a);
-                    response.getWriter().write(updateResponse.toString());
-                    break;
-                }
-                case "deleteAssessment":{
-                	System.out.println("Recieved action: deleteAssessment");
-                	int assessmentId=Integer.parseInt(request.getParameter("assessment_id"));
-                	JsonObject responseObj = assessmentService.deleteAssessment(assessmentId);
-                    response.getWriter().write(responseObj.toString());
-                    break;
-                }
-                case "addQuestion": {
-                    System.out.println("Received action: addQuestion");
-
-                    int assessmentId = Integer.parseInt(request.getParameter("assessment_id"));
-                    String questionText = request.getParameter("question_text");
-                    String optionA = request.getParameter("option_a");
-                    String optionB = request.getParameter("option_b");
-                    String optionC = request.getParameter("option_c");
-                    String optionD = request.getParameter("option_d");
-                    String correctAnswer = request.getParameter("correct_answer");
-                    int marks = Integer.parseInt(request.getParameter("marks"));
-
-                    QuestionModel q = new QuestionModel();
-                    q.setQuestion(questionText);
-                    q.setOptionA(optionA);
-                    q.setOptionB(optionB);
-                    q.setOptionC(optionC);
-                    q.setOptionD(optionD);
-                    q.setCorrectAnswer(correctAnswer);
-                    q.setMarks(marks);
-
-                    JsonObject res = assessmentService.addQuestion(assessmentId, q);
-                    response.getWriter().write(res.toString());
-                    break;
-                }
-                case "getQuestionsByAssessment": {
-                	 int assessmentId = Integer.parseInt(request.getParameter("assessment_id"));
-                	 System.out.println("inside getQuestonsAssement"+ assessmentId);
-                	 
-                    JsonObject res = assessmentService.getQuestionsByAssessment(assessmentId);
-                    response.getWriter().write(res.toString());
-                    break;
-                }
-                case "updateQuestion": {
-                    JsonObject res = new JsonObject();
-             
-                        JsonObject input = new JsonObject();
-                        input.addProperty("assessment_id", Integer.parseInt(request.getParameter("assessment_id")));
-                        input.addProperty("question_id", Integer.parseInt(request.getParameter("question_id")));
-                        input.addProperty("question", request.getParameter("question"));
-                        input.addProperty("optionA", request.getParameter("optionA"));
-                        input.addProperty("optionB", request.getParameter("optionB"));
-                        input.addProperty("optionC", request.getParameter("optionC"));
-                        input.addProperty("optionD", request.getParameter("optionD"));
-                        input.addProperty("correctAnswer", request.getParameter("correctAnswer"));
-                        input.addProperty("marks", Integer.parseInt(request.getParameter("marks")));
-
-                        JsonObject result = assessmentService.updateQuestion(input);
-                        response.getWriter().write(result.toString());
-                    break;
-                }
-                case "deleteQuestion": {
-                    JsonObject res = new JsonObject();
-                        JsonObject input = new JsonObject();
-                        input.addProperty("assessment_id", Integer.parseInt(request.getParameter("assessment_id")));
-                        input.addProperty("question_id", Integer.parseInt(request.getParameter("question_id")));
-
-                        JsonObject result = assessmentService.deleteQuestion(input);
-                        response.getWriter().write(result.toString());
-                    break;
-                }
-//                case "getAllAssessments":{
-//                	//int candidateId=Integer.parseInt(request.getParameter("userId"));
-//                	//System.out.println(candidateId);
-//                	JsonObject res=candidateService.getAllAssessments();
-//                	response.getWriter().write(res.toString());
-//                	break;
-//                }
-                case "getAssessmentsByCandidate": {
-                    try {
-                        int candidateId = (int)request.getSession().getAttribute("userId");
-                        CandidatesService candidateService = new CandidatesServiceImpl();
-                        JsonObject res = candidateService.getAssessmentsByCandidate(candidateId);
-                      
-                        response.getWriter().write(res.toString());
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                        JsonObject error = new JsonObject();
-                        error.addProperty("status", "error");
-                        error.addProperty("message", "Unable to fetch assessments");
-                        response.getWriter().write(error.toString());
-                    }
-                    break;
-                }
-                case "startCandidateAssessment": {
-                    try {
-                    	JsonObject res = new JsonObject();
-                       
-
-                        if (session == null || session.getAttribute("userId") == null) {
-                            res.addProperty("status", "error");
-                            res.addProperty("message", "Session expired. Please log in again.");
-                            response.getWriter().write(res.toString());
-                            break;
-                        }
-
-                        int candidateId = (int)session.getAttribute("userId");
-                        int assessmentId = Integer.parseInt(request.getParameter("assessment_id"));
-                        
-                        int durationMinutes=Integer.parseInt(request.getParameter("duration_minutes"));
-                        System.out.println(" candidateId = " + candidateId + ", assessmentId = " + assessmentId);
-
-                        res = candidateService.startCandidateAssessment(candidateId, assessmentId);
-
-                        if (res != null && "success".equals(res.get("status").getAsString())) {
-                          // currentSession.setAttribute("candidateAssessmentId", assessmentId);
-                            request.getSession().setAttribute("currentAssessmentId", assessmentId);
-                            session.setAttribute("durationMinutes", durationMinutes);
-                            // request.getSession().setAttribute("duration_minutes", durationMinutes);
-                            System.out.println("inside startCandidateAssessment "+assessmentId);
-                            response.sendRedirect("candidateTest.html");
-                            response.getWriter().write(res.toString());
-                           
-                        } else {
-                        	res.addProperty("status", "error");
-                        	res.addProperty("message", "Unable to start CandidateAssessment");
-                            response.getWriter().write(res.toString());
-                        }
-
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                        JsonObject error = new JsonObject();
-                        error.addProperty("status", "error");
-                        error.addProperty("message", "Exception in startCandidateAssessment: " + e.getMessage());
-                        response.getWriter().write(error.toString());
-                    }
-                    break;
-                }
-                case "candidateGetQuestion":{
-                	JsonObject res=new JsonObject();
-                	try {
-					
-						if (session == null || session.getAttribute("userId") == null) {
-							res.addProperty("status", "error");
-	                        res.addProperty("message", "Session expired. Please log in again.");
-	                        response.getWriter().write(res.toString());
-	                        break;
-	                    }
-						Integer assessmentId=(Integer)session.getAttribute("currentAssessmentId");
-						Integer durationMinutes=(Integer)session.getAttribute("durationMinutes");
-						System.out.println(assessmentId+" candidate Get questiomn "+durationMinutes );
-						res=assessmentService.getQuestionsByAssessment(assessmentId);
-						res.addProperty("duration_minutes", durationMinutes);
-						response.getWriter().write(res.toString());
-						
-						
-					} catch (Exception e) {
-						e.printStackTrace();
-						res.addProperty("status", "error");
-                        res.addProperty("message", "Unable to load quetions");
-                        response.getWriter().write(res.toString());
-					}
-                	break;
-                }
-                case "submitCandidateAnswers":{
-                	JsonObject res=new JsonObject();
-                	try {
-                		
-						if (session == null || session.getAttribute("userId") == null) {
-							res.addProperty("status", "error");
-	                        res.addProperty("message", "Session expired. Please log in again.");
-	                        response.getWriter().write(res.toString());
-	                        break;
-						}
-						int candidateId=(int)session.getAttribute("userId");
-						int assessmentId=(int)session.getAttribute("currentAssessmentId");
-						String answersJson=request.getParameter("answers"); 
-						System.out.println("candidateId "+candidateId+" assessmentId "+assessmentId+ "answers" +answersJson);
-						res=candidateService.submitCandidateAnswers(candidateId,assessmentId,answersJson);
-						response.getWriter().write(res.toString());
-					} catch (Exception e) {
-						e.printStackTrace();
-						res.addProperty("status", "error");
-                        res.addProperty("message", "Unable to load answers");
-                        response.getWriter().write(res.toString());
-					}
-                	break;
-                }
-            
-                case "getCandidateSubmissions":{
-                	JsonObject res=new JsonObject();
-                	try {
-                		
-						int panelId=(int)session.getAttribute("userId");
-						if(panelId==0) {
-							res.addProperty("status", "error");
-							res.addProperty("message", "missing panel id");
-							break;
-						}
-						System.out.println("Fetching panelId "+panelId);
-						res=candidateService.getCandidateAnswers(panelId);
-						
-					} catch (Exception e) {
-						e.printStackTrace();
-						res.addProperty("status", "error");
-						res.addProperty("message", "Exception in getubmitted for Panel");
-					}
-                	response.getWriter().write(res.toString());
-                	break;
-                }
-                
-                
-                case "evaluateCandidateAssessment": {
-                	  JsonObject res = new JsonObject();
-                	  try {
-//                	    if (session == null || session.getAttribute("userId") == null) {
-//                	      res.addProperty("status", "error");
-//                	      res.addProperty("message", "Session expired. Please log in again.");
-//                	      response.getWriter().write(res.toString());
-//                	      break;
-//                	    }
-//
-//                	    int panelUserId = (int) session.getAttribute("userId");
-                	    int candidateAssessmentId = Integer.parseInt(request.getParameter("candidate_assessment_id"));
-
-//                	    System.out.println("Panel " + panelUserId + " evaluating candidate assessment: " + candidateAssessmentId);
-
-                	    res = candidateService.evaluateCandidateAssessment(candidateAssessmentId);
-                	    response.getWriter().write(res.toString());
-
-                	  } catch (Exception e) {
-                	    e.printStackTrace();
-                	    res.addProperty("status", "error");
-                	    res.addProperty("message", "Evaluation failed: " + e.getMessage());
-                	    response.getWriter().write(res.toString());
-                	  }
-                	  break;
-                	}
-                case "submitManualEvaluation": {
-                	  JsonObject res = new JsonObject();
-                	  try {
-                	    int candidateAssessmentId = Integer.parseInt(request.getParameter("candidate_assessment_id"));
-                	    String evaluationJson = request.getParameter("evaluation");
-                	    String remarks = request.getParameter("panelRemarks");
-
-                	    res = candidateService.saveManualEvaluation(candidateAssessmentId, evaluationJson, remarks);
-                	    response.getWriter().write(res.toString());
-                	  } catch (Exception e) {
-                	    e.printStackTrace();
-                	    res.addProperty("status", "error");
-                	    res.addProperty("message", "Error in submitManualEvaluation: " + e.getMessage());
-                	    response.getWriter().write(res.toString());
-                	  }
-                	  break;
-                	}
-                case "getCandidateResult": {
-                    JsonObject res = new JsonObject();
-                    try {
-                        int candidateAssessmentId = Integer.parseInt(request.getParameter("candidate_assessment_id"));
-                        session.setAttribute("candidateAssessmentId",candidateAssessmentId);
-                        if(candidateAssessmentId==0) {
-                        	res.addProperty("status", "error");
-                        	res.addProperty("message", "no id found");
-                        }		
-                        res = resultService.getCandidateResult(candidateAssessmentId);
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                        res.addProperty("status", "error");
-                        res.addProperty("message", "Error fetching result");
-                    }
-                    response.getWriter().write(res.toString());
-                    break;
-                }
-//                case "adminDashboardData":{
-//                	JsonObject result=dashboardService.getAdminDashboardData();
-//                	response.getWriter().write(result.toString());
-//                	break;
-//                	}
-                case "logout":{
-                	System.out.println("User logout intitiated");
-                	JsonObject res=new JsonObject();
-                	try {
-						session=request.getSession(false);
-						if(session!=null) {
-							session.invalidate();
-							System.out.println("Session invlaidated sucesfulyy");
-						}
-						 res.addProperty("status", "success");
-	                     res.addProperty("message", "Logged out successfully");
-						
-					} catch (Exception e) {
-						e.printStackTrace();
-						 res.addProperty("status", "error");
-	                     res.addProperty("message", "Error, unable to logout");
-	                     response.getWriter().write(res.toString());
-					}
-                	break;
-                }
-
-                
-               
-                default:
-                    jsonResponse.addProperty("status", "error");
-                    jsonResponse.addProperty("message", "Invalid action");
-                    response.getWriter().write(jsonResponse.toString());
-            }
-
-        } catch (Exception e) {
-            e.printStackTrace();
-            jsonResponse.addProperty("status", "error");
-            jsonResponse.addProperty("message", "Internal Server Error: " + e.getMessage());
-            response.getWriter().write(jsonResponse.toString());
-        }
-    }
-}
+    <script src="utils.js"></script>
+    <script src="adminDashboard.js"></script>
+  </body>
+</html>
