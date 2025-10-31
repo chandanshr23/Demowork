@@ -1,0 +1,417 @@
+package com.recruitement.dao;
+
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.util.ArrayList;
+import java.util.List;
+
+import org.mindrot.jbcrypt.BCrypt;
+
+import com.recruitement.dbconnection.DBConnector;
+import com.recruitement.model.UserModel;
+
+public class UserDAOImpl implements UserDAO{
+	
+
+	@Override
+	public UserModel getUserLogin(String username, String password) {
+		UserModel user=null;
+		Connection conn = null;
+		PreparedStatement pstmt = null;
+		ResultSet res = null;
+		try {
+			conn=DBConnector.getConnection();
+			
+//			String sql="Select user_id,username, full_name, email,password,phone_no,role,expertise,status from m_d_user where username=?";
+			String sql="Select user_id,username, full_name, email,password,phone_no,role,expertise,status from chandan_recruitement.M_D_USER where username=? and status=1";
+			pstmt=conn.prepareStatement(sql);
+			
+			pstmt.setString(1, username);
+			res=pstmt.executeQuery();
+			
+			if(res.next()) {
+				user=new UserModel();		
+				String storedHash = res.getString("password");
+				
+				if (BCrypt.checkpw(password, storedHash)) {
+					System.out.println("password");
+					user.setUserId(res.getInt("user_id"));
+					user.setUsername(res.getString("username"));
+					user.setFullName(res.getString("full_name"));
+					user.setEmail(res.getString("email"));
+					user.setPassword(res.getString("password"));
+					user.setPhoneNo(res.getString("phone_no"));
+					user.setRole(res.getString("role"));
+					user.setExpertise(res.getString("expertise"));
+					user.setStatus(res.getBoolean("status"));
+					
+					return user;
+				}
+				else {
+					System.out.println("Password not matched");
+					return null;
+				}
+			}
+		}
+		catch(Exception e) {
+			e.printStackTrace();
+		}finally {
+			try {
+				if(res != null) res.close();
+				if(pstmt != null) pstmt.close();
+				if(conn != null) conn.close();
+			} catch(Exception e) {
+				e.printStackTrace();
+			}
+		}
+			
+		return null;
+	}
+
+
+	@Override
+	public int addUser(UserModel user) {
+		
+		int x=0;
+		Connection conn = null;
+		PreparedStatement pstmt = null;
+		try {
+			conn=DBConnector.getConnection();
+//			String sql="Insert into m_d_user(username,full_name, email,password,phone_no,role,expertise,status) values(?,?,?,?,?,?,?,1)";
+			String sql="Insert into chandan_recruitement.M_D_USER(username,full_name, email,password,phone_no,role,expertise,status) values(?,?,?,?,?,?,?,1)";
+
+			pstmt=conn.prepareStatement(sql);
+			
+			pstmt.setString(1,user.getUsername());
+			pstmt.setString(2, user.getFullName());
+			pstmt.setString(3, user.getEmail());
+			String passwordHash = BCrypt.hashpw(user.getPassword(), BCrypt.gensalt());
+			pstmt.setString(4, passwordHash);
+			pstmt.setString(5, user.getPhoneNo());
+			pstmt.setString(6,user.getRole());
+			pstmt.setString(7, user.getExpertise());
+			
+			x=pstmt.executeUpdate();
+			System.out.println("Affected rows"+ x);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}finally {
+			try {
+				if(pstmt != null) pstmt.close();
+				if(conn != null) conn.close();
+			} catch(Exception e) {
+				e.printStackTrace();
+			}
+		}
+		return x;
+	}
+
+	@Override
+	public List<UserModel> getAllUsersByRole(String role) {
+		List<UserModel> userList=new ArrayList<>();
+		Connection conn = null;
+		PreparedStatement pstmt = null;
+		ResultSet rs = null;
+		
+		try {
+			conn=DBConnector.getConnection();
+//		
+//			String sql="SELECT u.user_id, u.username, u.full_name, u.email, u.phone_no, u.role, u.expertise, u.status, u.panel_id, " +
+//					   "p.full_name as panel_name FROM m_d_user u " +
+//					   "LEFT JOIN m_d_user p ON u.panel_id = p.user_id " +
+//					   "WHERE u.role=? AND u.status = 1";
+
+			String sql="SELECT u.user_id, u.username, u.full_name, u.email, u.phone_no, u.role, u.expertise, u.status, u.panel_id, " +
+					   "p.full_name as panel_name FROM chandan_recruitement.M_D_USER u " +
+					   "LEFT JOIN chandan_recruitement.M_D_USER  p ON u.panel_id = p.user_id " +
+					   "WHERE u.role=? AND u.status = 1";
+			pstmt=conn.prepareStatement(sql);
+			pstmt.setString(1, role);
+			rs=pstmt.executeQuery();
+			
+			while(rs.next()) {
+				UserModel user=new UserModel();
+				
+				user.setUserId(rs.getInt("user_id"));
+				user.setUsername(rs.getString("username"));
+				user.setFullName(rs.getString("full_name"));
+				user.setEmail(rs.getString("email"));
+				user.setPhoneNo(rs.getString("phone_no"));
+				user.setRole(rs.getString("role"));
+				user.setExpertise(rs.getString("expertise"));
+				user.setStatus(rs.getBoolean("status"));
+				
+				
+				int panelId = rs.getInt("panel_id");
+				user.setPanel_id(panelId);
+				if(panelId > 0) {
+					user.setPanelName(rs.getString("panel_name"));
+				} else {
+					user.setPanelName(null);
+				}
+				
+				userList.add(user);
+			}
+			System.out.println("Loaded " + userList.size() + " users with role: " + role);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}finally {
+			try {
+				if(rs != null) rs.close();
+				if(pstmt != null) pstmt.close();
+				if(conn != null) conn.close();
+			} catch(Exception e) {
+				e.printStackTrace();
+			}
+		}
+		return userList;
+	}
+
+	@Override
+	public int updateUserById(int userId, String email, String fullName, String phoneNo, String expertise) {
+		int x=0;
+		Connection conn = null;
+		PreparedStatement pstmt = null;
+		try {
+			conn=DBConnector.getConnection();
+//			String sql="Update m_d_user set email=? ,full_name=?, phone_no=?,expertise=?, update_time=NOW() where user_id=?";
+			String sql="Update chandan_recruitement.M_D_USER set email=? ,full_name=?, phone_no=?,expertise=?, update_time=GETDATE() where user_id=?";
+
+			pstmt=conn.prepareStatement(sql);
+			pstmt.setString(1, email);
+			pstmt.setString(2, fullName);
+			pstmt.setString(3, phoneNo);
+			pstmt.setString(4, expertise);
+			pstmt.setInt(5, userId);
+			x = pstmt.executeUpdate();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}finally {
+			try {
+				if(pstmt != null) pstmt.close();
+				if(conn != null) conn.close();
+			} catch(Exception e) {
+				e.printStackTrace();
+			}
+		}
+		return x;
+	}
+
+	@Override
+	public int deleteUserById(int userId) {
+		int rows = 0;
+		Connection conn = null;
+		PreparedStatement pstmt = null;
+		try {
+			conn = DBConnector.getConnection();
+//			String sql = "UPDATE m_d_user SET status = 0 WHERE user_id = ?";
+			String sql = "UPDATE chandan_recruitement.M_D_USER SET status = 0 WHERE user_id = ?";
+
+			pstmt = conn.prepareStatement(sql);
+			pstmt.setInt(1, userId);
+			rows = pstmt.executeUpdate();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}finally {
+			try {
+				if(pstmt != null) pstmt.close();
+				if(conn != null) conn.close();
+			} catch(Exception e) {
+				e.printStackTrace();
+			}
+		}
+		return rows;
+	}
+
+	@Override
+	public int assignPanel(int candidateId, int panelId) {
+		int x = 0;
+		Connection conn = null;
+		PreparedStatement pstmt = null;
+		try {
+			conn = DBConnector.getConnection();
+//			String sql = "UPDATE m_d_user SET panel_id = ? WHERE user_id = ? AND role = 'CANDIDATE'";
+			String sql = "UPDATE chandan_recruitement.M_D_USER SET panel_id = ? WHERE user_id = ? AND role = 'CANDIDATE'";
+
+			pstmt = conn.prepareStatement(sql);
+			pstmt.setInt(1, panelId);
+			pstmt.setInt(2, candidateId);
+			x = pstmt.executeUpdate();
+			System.out.println("Assigned panel " + panelId + " to candidate " + candidateId + ", rows affected: " + x);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}finally {
+			try {
+				if(pstmt != null) pstmt.close();
+				if(conn != null) conn.close();
+			} catch(Exception e) {
+				e.printStackTrace();
+			}
+		}
+		return x;
+	}
+
+	@Override
+	public List<UserModel> getAllUsers() {
+		return null;
+	}
+
+	@Override
+	public UserModel getUserById(int userId) {
+		UserModel user = null;
+		Connection conn = null;
+		PreparedStatement pstmt = null;
+		ResultSet rs = null;
+		
+		try { 
+			conn = DBConnector.getConnection();
+		
+//			String sql = "SELECT u.user_id, u.username, u.full_name, u.email, u.phone_no, u.role, u.expertise, u.status, u.panel_id, " +
+//						 "p.full_name as panel_name FROM m_d_user u " +
+//						 "LEFT JOIN m_d_user p ON u.panel_id = p.user_id " +
+//						 "WHERE u.user_id = ?";
+			
+			String sql = "SELECT u.user_id, u.username, u.full_name, u.email, u.phone_no, u.role, u.expertise, u.status, u.panel_id, " +
+					 "p.full_name as panel_name FROM chandan_recruitement.M_D_USER u " +
+					 "LEFT JOIN chandan_recruitement.M_D_USER p ON u.panel_id = p.user_id " +
+					 "WHERE u.user_id = ?"; 
+			pstmt = conn.prepareStatement(sql);
+			pstmt.setInt(1, userId);
+			rs = pstmt.executeQuery();
+			if (rs.next()) {
+				user = new UserModel();
+				user.setUserId(rs.getInt("user_id"));
+				user.setUsername(rs.getString("username"));
+				user.setFullName(rs.getString("full_name"));
+				user.setEmail(rs.getString("email"));
+				user.setPhoneNo(rs.getString("phone_no"));
+				user.setRole(rs.getString("role"));
+				user.setExpertise(rs.getString("expertise"));
+				user.setStatus(rs.getBoolean("status"));
+				
+			
+				int panelId = rs.getInt("panel_id");
+				user.setPanel_id(panelId);
+				if(panelId > 0) {
+					user.setPanelName(rs.getString("panel_name"));
+				} else {
+					user.setPanelName(null);
+				}
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}finally {
+			try {
+				if(rs != null) rs.close();
+				if(pstmt != null) pstmt.close();
+				if(conn != null) conn.close();
+			} catch(Exception e) {
+				e.printStackTrace();
+			}
+		}
+		return user;
+	}
+
+	@Override
+	public List<UserModel> getCandidateByPanel(int panelId) {
+		List<UserModel> candidates=new ArrayList<UserModel>();
+		Connection conn = null;
+		PreparedStatement pstmt = null;
+		ResultSet rs = null;
+		try {
+			conn=DBConnector.getConnection();
+//			String sql="Select u.user_id, u.username,u.full_name,u.email,u.phone_no,u.role,u.status,p.full_name as panel_name,p.user_id as panel_id from m_d_user u join m_d_user p on u.panel_id=p.user_id where u.role ='CANDIDATE' and u.panel_id=?";
+			String sql="Select u.user_id, u.username,u.full_name,u.email,u.phone_no,u.role,u.status,p.full_name as panel_name,p.user_id as panel_id from chandan_recruitement.M_D_USER u join chandan_recruitement.M_D_USER p on u.panel_id=p.user_id where u.role ='CANDIDATE' and u.panel_id=?";
+
+			pstmt = conn.prepareStatement(sql);
+			pstmt.setInt(1, panelId);
+
+			rs = pstmt.executeQuery();
+			while (rs.next()) {
+				UserModel user = new UserModel();
+				user.setUserId(rs.getInt("user_id"));
+				user.setUsername(rs.getString("username"));
+				user.setFullName(rs.getString("full_name"));
+				user.setEmail(rs.getString("email"));
+				user.setPhoneNo(rs.getString("phone_no"));
+				user.setRole(rs.getString("role"));
+				user.setStatus(rs.getBoolean("status"));
+				user.setPanel_id(rs.getInt("panel_id"));
+				user.setPanelName(rs.getString("panel_name"));
+				candidates.add(user);
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}finally {
+			try {
+				if(rs != null) rs.close();
+				if(pstmt != null) pstmt.close();
+				if(conn != null) conn.close();
+			} catch(Exception e) {
+				e.printStackTrace();
+			}
+		}
+		return candidates;
+	}
+
+	public boolean checkUsernameExists(String username) {
+		boolean exists=false;
+		Connection conn = null;
+		PreparedStatement pstmt = null;
+		ResultSet rs = null;
+		try {
+			conn=DBConnector.getConnection();
+//			String sql="Select count(*) as cnt from m_d_user where username=? ";
+			String sql="Select count(*) as cnt from chandan_recruitement.M_D_USER where username=? ";
+			pstmt=conn.prepareStatement(sql);
+			pstmt.setString(1,username);
+			rs=pstmt.executeQuery();
+			if(rs.next()) {
+				exists=rs.getInt("cnt")>0;
+			}
+		}
+		catch (Exception e) {
+			e.printStackTrace();
+		}finally {
+			try {
+				if(rs != null) rs.close();
+				if(pstmt != null) pstmt.close();
+				if(conn != null) conn.close();
+			} catch(Exception e) {
+				e.printStackTrace();
+			}
+		}
+		return exists;
+	}	
+	
+	public boolean checkEmailExists(String email) {
+		boolean exists=false;
+		Connection conn = null;
+		PreparedStatement pstmt = null;
+		ResultSet rs = null;
+		try {
+			conn=DBConnector.getConnection();
+//			String sql="Select count(*) as cnt from m_d_user where email=? ";
+			String sql="Select count(*) as cnt from chandan_recruitement.M_D_USER where email=? ";
+			pstmt=conn.prepareStatement(sql);
+			pstmt.setString(1,email);
+			rs=pstmt.executeQuery();
+			if(rs.next()) {
+				exists=rs.getInt("cnt")>0;
+			}
+		}
+		catch (Exception e) {
+			e.printStackTrace();
+		}finally {
+			try {
+				if(rs != null) rs.close();
+				if(pstmt != null) pstmt.close();
+				if(conn != null) conn.close();
+			} catch(Exception e) {
+				e.printStackTrace();
+			}
+		}
+		return exists;
+	}
+}
