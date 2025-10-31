@@ -1,0 +1,105 @@
+    @Override
+    protected void doPost(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
+
+        response.setContentType("application/json");
+        response.setCharacterEncoding("UTF-8");
+
+        Gson gson = new Gson();
+        String action = request.getParameter("action");
+        System.out.println("POST - Received action: " + action);
+
+        JsonObject jsonResponse = new JsonObject();
+        HttpSession session = request.getSession(false);
+
+        if (!"login".equals(action)) {
+            if (session == null || session.getAttribute("userId") == null) {
+                jsonResponse.addProperty("status", "error");
+                jsonResponse.addProperty("message", "Session expired. Please login again");
+                response.getWriter().write(jsonResponse.toString());
+                return;
+            }
+        }
+
+        try {
+            switch (action != null ? action : "") {
+
+                case "login": {
+                    String username = request.getParameter("username");
+                    String password = request.getParameter("password");
+
+                    JsonObject userResponse = userService.userLogin(username, password);
+
+                    if ("success".equals(userResponse.get("status").getAsString())) {
+                        session = request.getSession(true);
+                        session.setAttribute("username", userResponse.get("username").getAsString());
+                        session.setAttribute("fullName", userResponse.get("full_name").getAsString());
+                        session.setAttribute("role", userResponse.get("role").getAsString());
+                        session.setAttribute("userId", userResponse.get("userId").getAsInt());
+//                        System.out.println("Session created for userId: " + session.getAttribute("userId"));
+                        logger.info("Session created for userId: " + session.getAttribute("userId"));
+                    }
+                    response.getWriter().write(userResponse.toString());
+                    break;
+                }
+
+                case "logout": {
+                    System.out.println("User logout initiated");
+                    JsonObject res = new JsonObject();
+                    try {
+                        session = request.getSession(false);
+                        if (session != null) {
+                            session.invalidate();
+                            System.out.println("Session invalidated successfully");
+                        }
+                        res.addProperty("status", "success");
+                        res.addProperty("message", "Logged out successfully");
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                        res.addProperty("status", "error");
+                        res.addProperty("message", "Error, unable to logout");
+                    }
+                    response.getWriter().write(res.toString());
+                    break;
+                }
+
+                case "addUser": {
+                    String username = request.getParameter("username");
+                    String fullName = request.getParameter("full_name");
+                    String email = request.getParameter("email");
+                    String password = request.getParameter("password");
+                    String phone = request.getParameter("phone");
+                    String role = request.getParameter("role");
+                    String expertise = request.getParameter("expertise");
+
+                    JsonObject addResult = userService.addUser(username, fullName, email, password, phone, expertise, role, true);
+                    response.getWriter().write(addResult.toString());
+                    break;
+                }
+
+                case "updateUser": {
+                    int userId = Integer.parseInt(request.getParameter("user_id"));
+                    String fullName = request.getParameter("full_name");
+                    String email = request.getParameter("email");
+                    String phone = request.getParameter("phone_no");
+                    String expertise = request.getParameter("expertise");
+
+                    JsonObject result = userService.updateUserById(userId, email, fullName, phone, expertise);
+                    response.getWriter().write(result.toString());
+                    break;
+                }
+
+                case "deleteUser": {
+                    int userId = Integer.parseInt(request.getParameter("userId"));
+                    JsonObject responseObj = userService.deleteUserById(userId);
+                    response.getWriter().write(responseObj.toString());
+                    break;
+                }
+
+                case "assignPanel": {
+                    int candidateId = Integer.parseInt(request.getParameter("candidateId"));
+                    int panelId = Integer.parseInt(request.getParameter("panelId"));
+                    JsonObject assign = userService.assignPanel(candidateId, panelId);
+                    response.getWriter().write(assign.toString());
+                    break;
+                }
