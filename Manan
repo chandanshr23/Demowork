@@ -1,1 +1,253 @@
+case "addAssessment": {
+    logger.info("Received action addAssessment");
+    int userId = Integer.parseInt(session.getAttribute("userId").toString());
+    
+    String name = request.getParameter("assessment_name");
+    String subject = request.getParameter("subject");
+    String desc = request.getParameter("description");
+    int duration = Integer.parseInt(request.getParameter("duration_minutes"));
+    int totalMarks = Integer.parseInt(request.getParameter("total_marks"));
+    int passMarks = Integer.parseInt(request.getParameter("passing_marks"));
 
+    AssessmentModel a = new AssessmentModel();
+    a.setAssessmentName(name);
+    a.setSubject(subject);
+    a.setDescription(desc);
+    a.setDurationMin(duration);
+    a.setTotalMarks(totalMarks);
+    a.setPassingMarks(passMarks);
+    a.setUserId(userId);
+    
+    JsonObject result = assessmentService.addAssessment(a);
+    
+    if ("success".equals(result.get("status").getAsString())) {
+        // Notify all candidates assigned to this panel
+        JsonObject candidateRes = userService.getCandidatesByPanel(userId);
+        if ("success".equals(candidateRes.get("status").getAsString())) {
+            JsonArray candidates = candidateRes.getAsJsonArray("candidates");
+            
+            for (int i = 0; i < candidates.size(); i++) {
+                JsonObject cand = candidates.get(i).getAsJsonObject();
+                int candidateId = cand.get("user_id").getAsInt();
+                
+                // Use the new sendNotification method with DB persistence
+                NotificationManager.sendNotification(
+                    candidateId,
+                    "assessment",
+                    "New assessment '" + name + "' has been assigned to you",
+                    null  // No specific reference_id for new assessments
+                );
+            }
+            logger.info("Notified " + candidates.size() + " candidates about new assessment");
+        }
+    }
+    
+    response.getWriter().write(result.toString());
+    break;
+}@Override
+public List<CandidateAnswerModel> getCandidateAnswer(int panelId) {
+    List<CandidateAnswerModel> list = new ArrayList<>();
+    Connection conn = null;
+    PreparedStatement pstmt = null;
+    ResultSet res = null;
+    try {
+        String sql = "SELECT ca.candidate_assessment_id, c.full_name, a.assessment_name, " +
+                    "ca.assigned_date, ca.status, p.full_name as panel_name " +
+                    "FROM chandan_recruitement.M_S_CANDIDATE_ASSESSMENT ca " +
+                    "JOIN chandan_recruitement.M_S_ASSESSMENT a ON ca.assessment_id = a.assessment_id " +
+                    "JOIN chandan_recruitement.M_D_USER c ON ca.candidate_id = c.user_id " +
+                    "JOIN chandan_recruitement.M_D_USER p ON a.user_id = p.user_id " +
+                    "WHERE c.panel_id = ? AND a.user_id = ? " +
+                    "ORDER BY ca.assigned_date DESC";
+        
+        conn = DBConnector.getConnection();
+        pstmt = conn.prepareStatement(sql);
+        pstmt.setInt(1, panelId);
+        pstmt.setInt(2, panelId);
+        res = pstmt.executeQuery();
+        
+        while (res.next()) {
+            CandidateAnswerModel assessments = new CandidateAnswerModel();
+            assessments.setCandidateAssessmentId(res.getInt("candidate_assessment_id"));
+            assessments.setFullName(res.getString("full_name"));
+            assessments.setAssessmentName(res.getString("assessment_name"));
+            assessments.setAssignedDate(res.getString("assigned_date"));
+            assessments.setStatus(res.getString("status"));
+            list.add(assessments);
+        }
+    } catch (Exception e) {
+        e.printStackTrace();
+    } finally {
+        try {
+            if (res != null) res.close();
+            if (pstmt != null) pstmt.close();
+            if (conn != null) conn.close();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+    return list;
+}case "submitManualEvaluation": {
+    logger.info("Received action: submitManualEvaluation");
+    JsonObject res = new JsonObject();
+    try {
+        int candidateAssessmentId = Integer.parseInt(request.getParameter("candidate_assessment_id"));
+        String evaluationJson = request.getParameter("evaluation");
+        String remarks = request.getParameter("panelRemarks");
+
+        res = candidateService.saveManualEvaluation(candidateAssessmentId, evaluationJson, remarks);
+        
+        if (res.status == "success") {
+            // Get candidate ID from candidate_assessment_id
+            Connection conn = DBConnector.getConnection();
+            String sql = "SELECT ca.candidate_id, c.full_name, a.assessment_name " +
+                        "FROM chandan_recruitement.M_S_CANDIDATE_ASSESSMENT ca " +
+                        "JOIN chandan_recruitement.M_D_USER c ON ca.candidate_id = c.user_id " +
+                        "JOIN chandan_recruitement.M_S_ASSESSMENT a ON ca.assessment_id = a.assessment_id " +
+                        "WHERE ca.candidate_assessment_id = ?";
+            PreparedStatement pstmt = conn.prepareStatement(sql);
+            pstmt.setInt(1, candidateAssessmentId);
+            ResultSet rs = pstmt.executeQuery();
+            
+            if (rs.next()) {
+                int candidateId = rs.getInt("candidate_id");
+                String candidateName = rs.getString("full_name");
+                String assessmentName = rs.getString("assessment_name");
+                
+                // Send notification to candidate with reference to result
+                NotificationManager.sendNotification(
+                    candidateId,
+                    "result",
+                    "Your assessment '" + assessmentName + "' has been evaluated. View your results now!",
+                    candidateAssessmentId  // Reference to view result
+                );
+                
+                logger.info("Sent evaluation notification to candidate: " + candidateName);
+            }
+            
+            rs.close();
+            pstmt.close();
+            conn.close();
+        }
+        
+        logger.info("Evaluation submitted successfully of id " + candidateAssessmentId);
+        response.getWriter().write(res.toString());
+    } catch (Exception e) {
+        e.printStackTrace();
+        res.addProperty("status", "error");
+        res.addProperty("message", "Error in submitManualEvaluation: " + e.getMessage());
+        logger.warn("Manual evaluation failed");
+        response.getWriter().write(res.toString());
+    }
+    break;
+}function loadMissedNotifications() {
+    ajaxGet("getUnreadNotifications", {}, function(res) {
+        if (res.status == "success" && res.notifications && res.notifications.length > 0) {
+            let count = res.unread_count || res.notifications.length;
+            
+            // Update badge count
+            $("#badgeAssessment").text(count).removeClass("hidden");
+            
+            // Show summary toast notification
+            notyf.open({
+                type: "info",
+                message: `You have ${count} unread notification(s). Click on the bell icon to view.`,
+                duration: 5000
+            });
+            
+            // Auto-mark them as read after showing (optional)
+            // If you want them to stay unread until user clicks:
+            // Comment out the markAllAsRead() call below
+        }
+    });
+}
+
+function markAsRead(notificationId) {
+    ajaxGet("markNotificationRead", { notification_id: notificationId }, function(res) {
+        if (res.status == "success") {
+            let currentCount = parseInt($("#badgeAssessment").text()) || 0;
+            if (currentCount > 0) {
+                $("#badgeAssessment").text(currentCount - 1);
+                if (currentCount - 1 == 0) {
+                    $("#badgeAssessment").addClass("hidden");
+                }
+            }
+        }
+    });
+}
+
+function markAllAsRead() {
+    ajaxGet("markAllNotificationsRead", {}, function(res) {
+        if (res.status == "success") {
+            $("#badgeAssessment").addClass("hidden").text("0");
+            notyf.success("All notifications marked as read");
+        }
+    });
+}
+
+function formatDate(dateString) {
+    if (!dateString) return "Recently";
+    let date = new Date(dateString);
+    let now = new Date();
+    let diff = Math.floor((now - date) / 1000); // seconds
+    
+    if (diff < 60) return "Just now";
+    if (diff < 3600) return Math.floor(diff / 60) + " mins ago";
+    if (diff < 86400) return Math.floor(diff / 3600) + " hours ago";
+    return Math.floor(diff / 86400) + " days ago";
+}function loadMissedNotifications() {
+    ajaxGet("getUnreadNotifications", {}, function(res) {
+        if (res.status == "success" && res.notifications && res.notifications.length > 0) {
+            let candidateCount = 0;
+            let evaluationCount = 0;
+            
+            // Count by event type
+            res.notifications.forEach(notif => {
+                if (notif.event_type == "candidate") candidateCount++;
+                else if (notif.event_type == "evaluation") evaluationCount++;
+            });
+            
+            // Update badges
+            if (candidateCount > 0) {
+                $("#badgeCandidates").text(candidateCount).removeClass("hidden");
+            }
+            if (evaluationCount > 0) {
+                $("#badgeEvaluations").text(evaluationCount).removeClass("hidden");
+            }
+            
+            // Show summary notification
+            let total = res.unread_count || res.notifications.length;
+            notyf.open({
+                type: "info",
+                message: `You have ${total} unread notification(s)`,
+                duration: 5000
+            });
+        }
+    });
+}
+
+function markAsRead(notificationId, eventType) {
+    ajaxGet("markNotificationRead", { notification_id: notificationId }, function(res) {
+        if (res.status == "success") {
+            // Update the correct badge
+            let badgeSelector = eventType == "candidate" ? "#badgeCandidates" : "#badgeEvaluations";
+            let currentCount = parseInt($(badgeSelector).text()) || 0;
+            
+            if (currentCount > 0) {
+                $(badgeSelector).text(currentCount - 1);
+                if (currentCount - 1 == 0) {
+                    $(badgeSelector).addClass("hidden");
+                }
+            }
+        }
+    });
+}
+
+function markAllAsRead() {
+    ajaxGet("markAllNotificationsRead", {}, function(res) {
+        if (res.status == "success") {
+            $("#badgeCandidates, #badgeEvaluations").addClass("hidden").text("0");
+            notyf.success("All notifications marked as read");
+        }
+    });
+}
