@@ -1,859 +1,574 @@
-let notyf = new Notyf({
-  duration: 2500,
-  position: { x: "right", y: "top" },
-  types: [
-    { type: "success", background: "#16a34a", icon: false },
-    { type: "error", background: "#dc2626", icon: false },
-    { type: "info", background: "#2563eb", icon: false },
-    { type: "alert", background: "#fbff00ff", icon: false },
-  ],
-});
+CREATE TABLE m_s_notifications (
+    notification_id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    event_type VARCHAR(50) NOT NULL,  -- 'assessment', 'evaluation', 'result'
+    message TEXT NOT NULL,
+    reference_id INT,  -- assessment_id or candidate_assessment_id
+    is_read BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    read_at TIMESTAMP NULL,
+    
+    FOREIGN KEY (user_id) REFERENCES m_d_user(user_id),
+    INDEX idx_user_unread (user_id, is_read),
+    INDEX idx_created (created_at)
+);
+public class NotificationManager {
+    private static final Logger logger = LogManager.getLogger(NotificationManager.class);
+    private static final Map<Integer, ConnectionInfo> connections = new ConcurrentHashMap<>();
 
-function showConfirm(title, text, icon = "question", confirmText = "Yes") {
-  return Swal.fire({
-    title,
-    text,
-    icon,
-    showCancelButton: true,
-    confirmButtonColor: "#2563eb",
-    cancelButtonColor: "#6b7280",
-    confirmButtonText: confirmText,
-  });
-}
-
-function isValidEmail(email) {
-  return /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(email);
-}
-function isValidPhone(phone) {
-  return /^[0-9]{10}$/.test(phone);
-}
-function showError(inputId, message) {
-  $("#" + inputId).addClass("border-red-500");
-  $("#" + inputId + "_error").text(message);
-}
-function clearError(inputId) {
-  $("#" + inputId).removeClass("border-red-500");
-  $("#" + inputId + "_error").text("");
-}
-
-$(document).on("click","#cardCandidatesBox",function(){
-  $("#navCandidates").trigger("click");
-});
-$(document).on("click","#cardPanelsBox",function(){
-  $("#navPanels").trigger("click");
-});
-
-$(document).ready(function () {
-  $("#navDashboard").click(() => {
-    $("#dashboardSection").show();
-    $("#userSection").hide();
-    loadDashboard();
-  });
-  $("#navAdmins").click(() => showUserSection("ADMIN"));
-  $("#navPanels").click(() => showUserSection("PANEL"));
-  $("#navCandidates").click(() => showUserSection("CANDIDATE"));
-  $("#logoutBtn").click(() => logoutUser());
-
-  $("#dashboardSection").show();
-  $("#userSection").hide();
-  loadDashboard();
-});
-
-function showUserSection(role) {
-  $("#dashboardSection").hide();
-  $("#userSection").show();
-  $("#userSection").html(
-    `<div class='text-center text-gray-500 py-10'>Loading ${role} data...</div>`
-  );
-  loadUserPage(role);
-}
-
-let completionChart = null;
-let avgTimeChart = null;
-
-function loadDashboard() {
-  ajaxGet(
-    "adminDashboardData",
-    {},
-    function (res) {
-      try {
-        let cards = res && res.cards ? res.cards : {};
-        $("#cardCandidates").text(cards.candidates ?? "--");
-        $("#cardPanels").text(cards.panels ?? "--");
-        $("#cardTests").text(cards.tests ?? "--");
-        $("#cardCompleted").text(cards.completed ?? "--");
-
-        if (completionChart) {
-          completionChart.destroy();
-          completionChart = null;
+    public static class ConnectionInfo {
+        PrintWriter writer;
+        String role;
+        public ConnectionInfo(PrintWriter writer, String role) {
+            this.writer = writer;
+            this.role = role;
         }
-        if (avgTimeChart) {
-          avgTimeChart.destroy();
-          avgTimeChart = null;
-        }
-
-        $("#completionChart").empty();
-        $("#avgTimeChart").empty();
-
-        let completionLabels = [
-          "Java Test",
-          "Python Test",
-          "ReactJS Test",
-          "SQL Test",
-          "DevOps Test",
-        ];
-        let completionValues = [85, 92, 78, 88, 95];
-
-        if (
-          res.completion &&
-          Array.isArray(res.completion.labels) &&
-          res.completion.labels.length > 0
-        ) {
-          completionLabels = res.completion.labels;
-          completionValues = res.completion.values || [];
-        }
-
-        var completionOptions = {
-          series: [
-            {
-              name: "Completion %",
-              data: completionValues,
-            },
-          ],
-          chart: {
-            type: "bar",
-            height: 300,
-            toolbar: {
-              show: true,
-              tools: {
-                download: true,
-                zoom: false,
-                zoomin: false,
-                zoomout: false,
-                pan: false,
-                reset: false,
-              },
-            },
-          },
-          plotOptions: {
-            bar: {
-              borderRadius: 4,
-              dataLabels: {
-                position: "top",
-              },
-            },
-          },
-          dataLabels: {
-            enabled: true,
-            formatter: function (val) {
-              return val + "%";
-            },
-            offsetY: -20,
-            style: {
-              fontSize: "12px",
-              colors: ["#304758"],
-            },
-          },
-          xaxis: {
-            categories: completionLabels,
-            position: "bottom",
-            labels: {
-              rotate: -45,
-              rotateAlways: true,
-            },
-          },
-          yaxis: {
-            min: 0,
-            max: 100,
-            labels: {
-              formatter: function (val) {
-                return val + "%";
-              },
-            },
-          },
-          colors: ["#3b82f6"],
-          title: {
-            text: "Test Completion Percentage",
-            align: "center",
-            style: {
-              fontSize: "14px",
-              fontWeight: "bold",
-            },
-          },
-        };
-
-        completionChart = new ApexCharts(
-          document.querySelector("#completionChart"),
-          completionOptions
-        );
-        completionChart.render();
-
-        let avgTimeLabels = [
-          "Java Test",
-          "Python Test",
-          "ReactJS Test",
-          "SQL Test",
-          "DevOps Test",
-        ];
-        let avgTimeValues = [45, 38, 52, 41, 35];
-
-        if (
-          res.avgTime &&
-          Array.isArray(res.avgTime.labels) &&
-          res.avgTime.labels.length > 0
-        ) {
-          avgTimeLabels = res.avgTime.labels;
-          avgTimeValues = res.avgTime.values || [];
-        }
-
-        var avgTimeOptions = {
-          series: [
-            {
-              name: "Average Time (mins)",
-              data: avgTimeValues,
-            },
-          ],
-          chart: {
-            type: "line",
-            height: 300,
-            toolbar: {
-              show: true,
-              tools: {
-                download: true,
-                zoom: false,
-                zoomin: false,
-                zoomout: false,
-                pan: false,
-                reset: false,
-              },
-            },
-          },
-          stroke: {
-            curve: "smooth",
-            width: 3,
-          },
-          markers: {
-            size: 5,
-            hover: {
-              size: 7,
-            },
-          },
-          dataLabels: {
-            enabled: true,
-            formatter: function (val) {
-              return val + " min";
-            },
-            style: {
-              fontSize: "11px",
-            },
-          },
-          xaxis: {
-            categories: avgTimeLabels,
-            labels: {
-              rotate: -45,
-              rotateAlways: true,
-            },
-          },
-          yaxis: {
-            min: 0,
-            labels: {
-              formatter: function (val) {
-                return val + " min";
-              },
-            },
-          },
-          colors: ["#10b981"],
-          title: {
-            text: "Average Completion Time",
-            align: "center",
-            style: {
-              fontSize: "14px",
-              fontWeight: "bold",
-            },
-          },
-          grid: {
-            borderColor: "#e7e7e7",
-            row: {
-              colors: ["#f3f3f3", "transparent"],
-              opacity: 0.5,
-            },
-          },
-        };
-
-        avgTimeChart = new ApexCharts(
-          document.querySelector("#avgTimeChart"),
-          avgTimeOptions
-        );
-        avgTimeChart.render();
-
-        let recent = Array.isArray(res.recent) ? res.recent : [];
-        let rows = recent
-          .map(
-            (r) => `
-        <tr>
-          <td class="px-3 py-2">${escapeHtml(r.candidate ?? "-")}</td>
-          <td class="px-3 py-2">${escapeHtml(r.test ?? "-")}</td>
-          <td class="px-3 py-2">${escapeHtml(r.status ?? "-")}</td>
-          <td class="px-3 py-2">${escapeHtml(r.score ?? "-")}</td>
-          <td class="px-3 py-2">${escapeHtml(r.timeTaken ?? "-")}</td>
-        </tr>
-      `
-          )
-          .join("");
-        $("#recentBody").html(
-          rows ||
-            `<tr><td colspan="5" class="text-center text-gray-500">No recent submissions</td></tr>`
-        );
-
-        $("#leaderboardTable").DataTable({
-          destroy: true,
-          dom: 'Bfrtip',
-          buttons: [
-            { 
-              extend: 'excelHtml5',
-              title: 'Leaderboard_Report', 
-              className:'bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700',
-              exportOptions: { columns: ':visible' } 
-            }, 
-            { 
-              extend: 'pdfHtml5', 
-              title:'Leaderboard_Report', 
-              className: 'bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700', 
-              orientation: 'landscape',
-              pageSize: 'A4',
-              exportOptions:{ columns: ':visible' }
-            }, 
-            { 
-              extend: 'print', 
-              title: 'Leaderboard Report',
-              className: 'bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700' 
-            } 
-          ],
-          paging: true, 
-          searching: true, 
-          info: true, 
-          responsive: true 
-        });
-      } catch (e) {
-        console.error("Error processing dashboard response:", e);
-        notyf.error("Error loading dashboard");
-      }
-    },
-    function () {
-      notyf.error("Unable to fetch dashboard data");
-      $("#cardCandidates,#cardPanels,#cardTests,#cardCompleted").text("--");
-      $("#recentBody").html(
-        `<tr><td colspan="5" class="text-center text-gray-500">Unable to load data</td></tr>`
-      );
     }
-  );
-}
 
-function loadUserPage(role) {
-  let title = role.charAt(0) + role.slice(1).toLowerCase() + " Management";
-  let colCount = role === "PANEL" ? 6 : (role === "CANDIDATE" ? 6 : 5);
+    // Existing methods...
+    public static void addConnection(int userId, String role, PrintWriter writer) {
+        connections.put(userId, new ConnectionInfo(writer, role));
+        logger.info("Added SSE connection for user: " + userId + " (" + role + ")");
+    }
 
-  let html = `
-    <div class="flex justify-between mb-4">
-      <h2 class="text-2xl font-bold">${title}</h2>
-      <button id="btnAddUser" class="bg-blue-600 text-white px-4 py-2 rounded">+ Add</button>
-    </div>
+    public static void removeConnection(int userId) {
+        ConnectionInfo conn = connections.remove(userId);
+        if (conn != null) {
+            try { conn.writer.close(); } catch (Exception ignored) {}
+        }
+        logger.info("Removed SSE connection for user: " + userId);
+    }
 
-    <div class="overflow-x-auto bg-white rounded shadow">
-      <table id="userTable" class="display min-w-full">
-        <thead><tr>
-          <th>Username</th>
-          <th>FullName</th>
-          <th>Email</th>
-          <th>Phone Number</th>
-          ${role == "PANEL" ? "<th>Expertise</th>" : ""}
-          ${role == "CANDIDATE" ? "<th>Panel</th>" : ""}
-          <th>Actions</th>
-        </tr></thead>
-        <tbody id="userTableBody"></tbody>
-      </table>
-    </div>
+    /**
+     * NEW METHOD: Send notification with DB persistence
+     * This ensures notification is saved even if user is offline
+     */
+    public static void sendNotification(int userId, String eventType, String message, Integer referenceId) {
+        // STEP 1: Save to database FIRST (persistent)
+        boolean savedToDb = saveNotificationToDatabase(userId, eventType, message, referenceId);
+        
+        if (!savedToDb) {
+            logger.error("Failed to save notification to database for user: " + userId);
+            return;  // Don't send SSE if DB save failed
+        }
 
-    ${buildUserModal(role)}
-  `;
-  $("#userSection").html(html);
-  loadUsers(role);
-  bindUserActions(role);
-}
-
-function buildUserModal(role) {
-  return `
-    <div id="userModal" class="hidden fixed inset-0 bg-gray-800 bg-opacity-50 flex items-center justify-center z-50">
-      <div class="bg-white w-96 p-6 rounded shadow-lg max-h-[90vh] overflow-y-auto">
-        <h3 class="text-lg font-semibold mb-3">Add User</h3>
-        <form id="userForm" class="space-y-3">
-        <div>
-          <input type="text" id="username" placeholder="Username" class="w-full border rounded p-2" required>
-          <p id="username_error" class="text-red-500 text-xs mt-1"></p>
-        </div>
-        <div>
-          <input type="text" id="fullName" placeholder="FullName" class="w-full border rounded p-2" required>
-          <p id="fullName_error" class="text-red-500 text-xs mt-1"></p>
-        </div>
-        <div>
-          <input type="email" id="email" placeholder="Email" class="w-full border rounded p-2" required>
-          <p id="email_error" class="text-red-500 text-xs mt-1"></p>
-        </div>
-        <div>
-           <input type="password" id="password" placeholder="Password" class="w-full border rounded p-2" required>
-          <p id="password_error" class="text-red-500 text-xs mt-1"></p>
-        </div>
-        <div>
-              <input type="tel" id="phone" placeholder="Phone Number" class="w-full border rounded p-2"required>
-          <p id="phone_error" class="text-red-500 text-xs mt-1"></p>
-        </div>
-            ${
-              role == "PANEL"
-                ? `
-              <label class="block text-sm font-medium text-gray-700">Select Expertise (multiple)</label>
-              <select id="expertise" multiple class="w-full border rounded p-2 h-28 focus:ring-2 focus:ring-blue-500">
-                <option value="Java">Java</option>
-                <option value="Python">Python</option>
-                <option value="C++">C++</option>
-                <option value="ReactJS">ReactJS</option>
-                <option value="Spring Boot">Spring Boot</option>
-                <option value="Database (SQL)">Database (SQL)</option>
-                <option value="DevOps">DevOps</option>
-              </select>
-              <p class="text-xs text-gray-500">Hold Ctrl to select multiple</p>
-              `
-                : ""
+        // STEP 2: Try to send via SSE (real-time, if online)
+        ConnectionInfo conn = connections.get(userId);
+        if (conn != null) {
+            try {
+                conn.writer.write("event: " + eventType + "\n");
+                conn.writer.write("data: " + message + "\n\n");
+                conn.writer.flush();
+                logger.info("Sent SSE to user " + userId + ": " + message);
+            } catch (Exception e) {
+                logger.error("Failed to send SSE to user " + userId + ", but saved in DB");
+                removeConnection(userId);
             }
-          <div class="flex justify-end gap-2">
-            <button type="button" id="cancelModal" class="bg-gray-300 px-4 py-2 rounded">Cancel</button>
-            <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded">Save</button>
-          </div>
-        </form>
-      </div>
-    </div>
-  `;
-}
-
-function loadUsers(role) {
-  ajaxGet("getAllUsersByRole", { role: role }, function (res) {
-    if (res.status == "success" && res.users && res.users.length > 0) {
-      if ($.fn.DataTable.isDataTable("#userTable")) {
-        $("#userTable").DataTable().clear().destroy();
-      }
-
-      let rows = "";
-      res.users.forEach((u) => {
-        rows += buildTableRow(u, role);
-      });
-      $("#userTableBody").html(rows);
-
-      
-      $("#userTable").DataTable({
-        paging: true,
-        searching: true,
-        info: true,
-        responsive: true,
-        ordering: true,
-        dom: 'Bfrtip',
-        buttons: [ 
-          { 
-            extend: 'pdfHtml5', 
-            title: role + '_Users_Report', 
-            className: 'bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700', 
-            orientation: 'landscape',
-            pageSize: 'A4',
-            exportOptions:{ columns: ':visible' }
-          }, 
-          { 
-            extend: 'print', 
-            title: role + ' Users Report',
-            className: 'bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700' 
-          } 
-        ]
-      });
-    } else {
-      const colCount = role == "PANEL" ? 6 : (role == "CANDIDATE" ? 6 : 5);
-      $("#userTableBody").html(
-        `<tr><td colspan="${colCount}" class="text-center">No users found</td></tr>`
-      );
-    }
-  });
-}
-
-function buildTableRow(user, role) {
-  // Get current logged in user ID
-  let currentUserId = sessionStorage.getItem("user_id") || "";
-  let isOwnAccount = currentUserId == user.user_id;
-  
-  let html = "<tr>";
-  html += "<td>" + (user.username || "-") + "</td>";
-  html += "<td>" + (user.full_name || "-") + "</td>";
-  html += "<td>" + (user.email || "-") + "</td>";
-  html += "<td>" + (user.phone_no || "-") + "</td>";
-
-  if (role == "PANEL") {
-    html += "<td>" + (user.expertise || "-") + "</td>";
-  }
-  
-  if (role == "CANDIDATE") {
-    html += "<td>" + (user.panel_name || "Not Assigned") + "</td>";
-  }
-
-  html += `<td class="text-center space-x-1">`;
-  
-  if (role == "CANDIDATE") {
-    html += `
-      <button class="assignPanel bg-indigo-600 text-white px-2 py-1 rounded"
-              data-id="${user.user_id}">
-        Assign Panel
-      </button>
-    `;
-  }
-
-  html += `
-    <button class="editUser bg-yellow-500 text-white px-2 py-1 rounded"
-            data-id="${user.user_id}">
-      Edit
-    </button>
-  `;
-
-  if (!isOwnAccount) {
-    html += `
-      <button class="deleteUser bg-red-600 text-white px-2 py-1 rounded"
-              data-id="${user.user_id}">
-        Delete
-      </button>
-    `;
-  } else {
-    html += `
-      <span class="text-gray-400 text-xs italic">Your Account</span>
-    `;
-  }
-
-  html += "</td></tr>";
-  return html;
-}
-
-function bindUserActions(role) {
-  $("#btnAddUser").off("click");
-  $("#cancelModal").off("click");
-  $("#username").off("input");
-  $("#userForm").off("input");
-  $("#userForm").off("submit");
-  $(document).off("click", "#cancelEditModal");
-  $(document).off("click", ".assignPanel");
-  $(document).off("click", ".editUser");
-  $(document).off("click", ".deleteUser");
-  $("#assignCancel").off("click");
-  $("#assignSave").off("click");
-
-  $("#btnAddUser").click(() => {
-    $("#userForm")[0].reset();
-    $(".border-red-500").removeClass("border-red-500");
-    $("[id$='_error']").text("");
-    toggleModal("userModal", true);
-  });
-  $("#cancelModal").click(() => toggleModal("userModal", false));
-
-  let usernameCheckTimer = null;
-  let emailCheckTime = null;
-
-  $("#username").on("input", function () {
-    clearTimeout(usernameCheckTimer);
-    let username = $(this).val().trim();
-
-    if (username.length == 0) {
-      clearError("username");
-      return;
-    }
-
-    if (username.length < 8) {
-      showError("username", "Username must be at least 8 characters");
-      return;
-    }
-
-    usernameCheckTimer = setTimeout(() => {
-      ajaxGet("checkUsername", { username: username }, function (res) {
-        if (res.status == "error" && res.message.includes("taken")) {
-          showError("username", "Username already taken");
-        } else if (res.status == "success") {
-          clearError("username");
-          $("#username_error").html(
-            "<span class='text-green-600 text-xs'>✓ Available</span>"
-          );
         } else {
-          showError("username", "Error checking availability");
+            logger.info("User " + userId + " offline. Notification saved in DB for later.");
         }
-      });
-    }, 400);
-  });
-
-  $("#email").on("input", function () {
-    clearTimeout(emailCheckTime);
-    let email = $(this).val().trim();
-
-    if (!email.length) {
-      clearError("email");
-      return;
-    }
-    if(!isValidEmail(email)){
-      showError("email","Not a valid email");
-      return;
     }
 
-    emailCheckTime = setTimeout(() => {
-      ajaxGet("checkUsername", { email: email }, function (res2) {
-        if (res2.status == "exists") {
-          showError("email", "Email is already registered");
-        } else if (res2.status == "success") {
-          clearError("email");
-          $("#email_error").html(
-            "<span class='text-green-600 text-xs'>Valid email</span>"
-          );
-        } else {
-          showError("email", "Error checking availability");
+    /**
+     * Save notification to database
+     */
+    private static boolean saveNotificationToDatabase(int userId, String eventType, 
+                                                       String message, Integer referenceId) {
+        Connection conn = null;
+        PreparedStatement pstmt = null;
+        try {
+            conn = DBConnector.getConnection();
+            String sql = "INSERT INTO m_s_notifications (user_id, event_type, message, reference_id) " +
+                        "VALUES (?, ?, ?, ?)";
+            pstmt = conn.prepareStatement(sql);
+            pstmt.setInt(1, userId);
+            pstmt.setString(2, eventType);
+            pstmt.setString(3, message);
+            if (referenceId != null) {
+                pstmt.setInt(4, referenceId);
+            } else {
+                pstmt.setNull(4, java.sql.Types.INTEGER);
+            }
+            
+            int rows = pstmt.executeUpdate();
+            logger.info("Saved notification to DB for user " + userId);
+            return rows > 0;
+            
+        } catch (Exception e) {
+            logger.error("Error saving notification to DB: " + e.getMessage());
+            return false;
+        } finally {
+            try {
+                if (pstmt != null) pstmt.close();
+                if (conn != null) conn.close();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
         }
-      });
-    }, 400);
-  });
-
-  $("#userForm").on("input", "input", function () {
-    let id = $(this).attr("id");
-    if (id !== "username" && id !== "email") {
-      validateField(id);
     }
-  });
 
-  function validateField(id) {
-    let value = $("#" + id).val().trim();
-    switch (id) {
-      case "fullName":
-        return value.length < 3
-          ? showError(id, "Full name must be at least 3 characters")
-          : clearError(id);
-      case "email":
-        return !isValidEmail(value)
-          ? showError(id, "Invalid email format")
-          : clearError(id);
-      case "password":
-        return value.length < 8
-          ? showError(id, "Password must be at least 8 characters")
-          : clearError(id);
-      case "phone":
-        return !isValidPhone(value)
-          ? showError(id, "Enter valid 10-digit number")
-          : clearError(id);
+    /**
+     * Get unread notification count for user
+     */
+    public static int getUnreadCount(int userId) {
+        Connection conn = null;
+        PreparedStatement pstmt = null;
+        ResultSet rs = null;
+        try {
+            conn = DBConnector.getConnection();
+            String sql = "SELECT COUNT(*) as count FROM m_s_notifications " +
+                        "WHERE user_id = ? AND is_read = FALSE";
+            pstmt = conn.prepareStatement(sql);
+            pstmt.setInt(1, userId);
+            rs = pstmt.executeQuery();
+            
+            if (rs.next()) {
+                return rs.getInt("count");
+            }
+            return 0;
+            
+        } catch (Exception e) {
+            logger.error("Error getting unread count: " + e.getMessage());
+            return 0;
+        } finally {
+            try {
+                if (rs != null) rs.close();
+                if (pstmt != null) pstmt.close();
+                if (conn != null) conn.close();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
     }
-  }
 
-  $("#userForm").submit(function (e) {
-    e.preventDefault();
+    /**
+     * Get all unread notifications for user
+     */
+    public static JsonArray getUnreadNotifications(int userId) {
+        JsonArray notifications = new JsonArray();
+        Connection conn = null;
+        PreparedStatement pstmt = null;
+        ResultSet rs = null;
+        
+        try {
+            conn = DBConnector.getConnection();
+            String sql = "SELECT notification_id, event_type, message, reference_id, created_at " +
+                        "FROM m_s_notifications WHERE user_id = ? AND is_read = FALSE " +
+                        "ORDER BY created_at DESC LIMIT 20";
+            pstmt = conn.prepareStatement(sql);
+            pstmt.setInt(1, userId);
+            rs = pstmt.executeQuery();
+            
+            while (rs.next()) {
+                JsonObject notif = new JsonObject();
+                notif.addProperty("notification_id", rs.getInt("notification_id"));
+                notif.addProperty("event_type", rs.getString("event_type"));
+                notif.addProperty("message", rs.getString("message"));
+                notif.addProperty("reference_id", rs.getInt("reference_id"));
+                notif.addProperty("created_at", rs.getString("created_at"));
+                notifications.add(notif);
+            }
+            
+        } catch (Exception e) {
+            logger.error("Error fetching notifications: " + e.getMessage());
+        } finally {
+            try {
+                if (rs != null) rs.close();
+                if (pstmt != null) pstmt.close();
+                if (conn != null) conn.close();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+        
+        return notifications;
+    }
 
-    let isValid = true;
-    ["username", "fullName", "email", "password", "phone"].forEach((id) => {
-      validateField(id);
-      let errorText = $("#" + id + "_error").text();
-      if (errorText !== "" && !errorText.includes("Available") && !errorText.includes("Valid")) {
-        isValid = false;
-      }
-    });
+    /**
+     * Mark notification as read
+     */
+    public static boolean markAsRead(int notificationId) {
+        Connection conn = null;
+        PreparedStatement pstmt = null;
+        try {
+            conn = DBConnector.getConnection();
+            String sql = "UPDATE m_s_notifications SET is_read = TRUE, read_at = NOW() " +
+                        "WHERE notification_id = ?";
+            pstmt = conn.prepareStatement(sql);
+            pstmt.setInt(1, notificationId);
+            
+            int rows = pstmt.executeUpdate();
+            return rows > 0;
+            
+        } catch (Exception e) {
+            logger.error("Error marking notification as read: " + e.getMessage());
+            return false;
+        } finally {
+            try {
+                if (pstmt != null) pstmt.close();
+                if (conn != null) conn.close();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+    }
 
-    if ($("#username_error").text().includes("taken")) {
-      notyf.error("Username already taken, please choose a unique one");
-      return;
+    /**
+     * Mark all notifications as read for user
+     */
+    public static boolean markAllAsRead(int userId) {
+        Connection conn = null;
+        PreparedStatement pstmt = null;
+        try {
+            conn = DBConnector.getConnection();
+            String sql = "UPDATE m_s_notifications SET is_read = TRUE, read_at = NOW() " +
+                        "WHERE user_id = ? AND is_read = FALSE";
+            pstmt = conn.prepareStatement(sql);
+            pstmt.setInt(1, userId);
+            
+            int rows = pstmt.executeUpdate();
+            return rows > 0;
+            
+        } catch (Exception e) {
+            logger.error("Error marking all as read: " + e.getMessage());
+            return false;
+        } finally {
+            try {
+                if (pstmt != null) pstmt.close();
+                if (conn != null) conn.close();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+    }
+}
+
+// OLD CODE:
+NotificationManager.sendEvent(candidateId, "assessment", "New assessment added");
+
+// NEW CODE:
+NotificationManager.sendNotification(
+    candidateId,           // userId
+    "assessment",          // eventType
+    "New assessment \"" + assessmentName + "\" added by " + panelName,  // message
+    assessmentId           // referenceId (for navigation)
+);
+
+case "addAssessment": {
+    logger.info("Received action addAssessment");
+    int userId = Integer.parseInt(session.getAttribute("userId").toString());
+    
+    AssessmentModel a = new AssessmentModel();
+    // ... set properties ...
+    
+    JsonObject result = assessmentService.addAssessment(a);
+    
+    if ("success".equals(result.get("status").getAsString())) {
+        // Get assessment ID from result or database
+        int assessmentId = result.get("assessment_id").getAsInt();
+        
+        // Notify all candidates
+        JsonObject candidateRes = userService.getCandidatesByPanel(userId);
+        if ("success".equals(candidateRes.get("status").getAsString())) {
+            JsonArray candidates = candidateRes.getAsJsonArray("candidates");
+            
+            for (int i = 0; i < candidates.size(); i++) {
+                JsonObject cand = candidates.get(i).getAsJsonObject();
+                int candidateId = cand.get("user_id").getAsInt();
+                String panelName = cand.get("panel_name").getAsString();
+                
+                // NEW METHOD with DB persistence
+                NotificationManager.sendNotification(
+                    candidateId,
+                    "assessment",
+                    "New assessment \"" + a.getAssessmentName() + "\" assigned by " + panelName,
+                    assessmentId  // Can click to navigate
+                );
+            }
+        }
     }
     
-    if ($("#email_error").text().includes("registered")) {
-      notyf.error("Please try with valid email");
-      return;
-    }
+    response.getWriter().write(result.toString());
+    break;
+}
 
-    if (!isValid) {
-      notyf.error("Please correct highlighted errors");
-      return;
-    }
+// In MainServlet.java doGet method:
 
-    let expertise = $("#expertise").val();
-    ajaxPost(
-      "addUser",
-      {
-        role,
-        full_name: $("#fullName").val(),
-        username: $("#username").val(),
-        email: $("#email").val(),
-        password: $("#password").val(),
-        phone: $("#phone").val(),
-        expertise: (expertise || []).join(","),
-      },
-      function (res) {
-        if (res.status == "success") {
-          notyf.success(res.message || "User added successfully");
-          toggleModal("userModal", false);
-          $("#userForm")[0].reset();
-          loadUsers(role);
+case "getUnreadNotifications": {
+    logger.info("Received action: getUnreadNotifications");
+    JsonObject res = new JsonObject();
+    try {
+        int userId = (int) session.getAttribute("userId");
+        JsonArray notifications = NotificationManager.getUnreadNotifications(userId);
+        int unreadCount = NotificationManager.getUnreadCount(userId);
+        
+        res.addProperty("status", "success");
+        res.add("notifications", notifications);
+        res.addProperty("unread_count", unreadCount);
+        
+    } catch (Exception e) {
+        e.printStackTrace();
+        res.addProperty("status", "error");
+        res.addProperty("message", e.getMessage());
+    }
+    response.getWriter().write(res.toString());
+    break;
+}
+
+case "markNotificationRead": {
+    logger.info("Received action: markNotificationRead");
+    JsonObject res = new JsonObject();
+    try {
+        int notificationId = Integer.parseInt(request.getParameter("notification_id"));
+        boolean success = NotificationManager.markAsRead(notificationId);
+        
+        if (success) {
+            res.addProperty("status", "success");
         } else {
-          notyf.error(res.message || "Failed to add user");
+            res.addProperty("status", "error");
+            res.addProperty("message", "Failed to mark as read");
         }
-      }
-    );
-  });
-
-  $(document).on("click", "#cancelEditModal", function () {
-    toggleModal("editUserModal", false);
-  });
-
-  // Assign Panel
-  $(document).on("click", ".assignPanel", function () {
-    let candidateId = $(this).data("id");
-    $("#assignCandidateId").val(candidateId);
-    $("#assignPanelSelect").html("<option>Loading...</option>");
-    toggleModal("assignPanelModal", true);
-
-    ajaxGet("getAllUsersByRole", { role: "PANEL" }, function (res) {
-      if (res.status == "success" && Array.isArray(res.users)) {
-        let options = res.users
-          .map(
-            (u) =>
-              `<option value="${u.user_id}">${u.full_name} (${
-                u.expertise || "-"
-              })</option>`
-          )
-          .join("");
-        $("#assignPanelSelect").html(options);
-      } else {
-        $("#assignPanelSelect").html(
-          "<option disabled>No panels available</option>"
-        );
-      }
-    });
-  });
-
-  $("#assignCancel").click(() => toggleModal("assignPanelModal", false));
-
-  $("#assignSave").click(() => {
-    let candidateId = $("#assignCandidateId").val();
-    let panelId = $("#assignPanelSelect").val();
-
-    if (panelId == null) return notyf.error("Please select a panel member!");
-
-    ajaxPost("assignPanel", { candidateId, panelId }, function (res) {
-      if (res.status == "success") {
-        notyf.success(res.message);
-        toggleModal("assignPanelModal", false);
-        loadUsers("CANDIDATE");
-      } else {
-        notyf.error(res.message);
-      }
-    });
-  });
-
-  let originalUserData = {};
-  
-  $(document).on("click", ".editUser", function () {
-    let userId = $(this).data("id");
-
-    ajaxGet("getUserById", { user_id: userId }, function (res) {
-      if (res.status == "success" && res.user) {
-        let user = res.user;
-
-        originalUserData = {
-          full_name: user.full_name,
-          email: user.email,
-          phone_no: user.phone_no,
-          expertise: user.expertise || ""
-        };
-
-        $("#editUserId").val(user.user_id);
-        $("#editFullName").val(user.full_name);
-        $("#editEmail").val(user.email);
-        $("#editPhone").val(user.phone_no);
-        $("#editExpertise").val(user.expertise || "");
-        $("#editStatus").prop(
-          "checked",
-          user.status == true || user.status == "true"
-        );
-
-        if (user.role == "PANEL") $("#editExpertiseBlock").show();
-        else $("#editExpertiseBlock").hide();
-
-        toggleModal("editUserModal", true);
-      } else {
-        notyf.error("Unable to fetch user details");
-      }
-    });
-  });
-
-  $(document).on("submit", "#editUserForm", function (e) {
-    e.preventDefault();
-
-    let userId = $("#editUserId").val();
-    let fullName = $("#editFullName").val();
-    let email = $("#editEmail").val();
-    let phone = $("#editPhone").val();
-    let expertise = $("#editExpertise").val();
-
-
-    let hasChanges = (
-      originalUserData.full_name !== fullName ||
-      originalUserData.email !== email ||
-      originalUserData.phone_no !== phone ||
-      originalUserData.expertise !== expertise
-    );
-
-    if (!hasChanges) {
-      notyf.error("No changes found");
-      return;
+        
+    } catch (Exception e) {
+        e.printStackTrace();
+        res.addProperty("status", "error");
+        res.addProperty("message", e.getMessage());
     }
+    response.getWriter().write(res.toString());
+    break;
+}
 
-    ajaxPost(
-      "updateUser",
-      {
-        user_id: userId,
-        full_name: fullName,
-        email: email,
-        phone_no: phone,
-        expertise: expertise,
-      },
-      function (res) {
-        if (res.status == "success") {
-          notyf.success(res.message || "User updated successfully");
-          toggleModal("editUserModal", false);
-          loadUsers(role);
+case "markAllNotificationsRead": {
+    logger.info("Received action: markAllNotificationsRead");
+    JsonObject res = new JsonObject();
+    try {
+        int userId = (int) session.getAttribute("userId");
+        boolean success = NotificationManager.markAllAsRead(userId);
+        
+        if (success) {
+            res.addProperty("status", "success");
         } else {
-          notyf.error(res.message || "Failed to update user");
+            res.addProperty("status", "error");
+            res.addProperty("message", "Failed to mark all as read");
         }
-      }
-    );
-  });
+        
+    } catch (Exception e) {
+        e.printStackTrace();
+        res.addProperty("status", "error");
+        res.addProperty("message", e.getMessage());
+    }
+    response.getWriter().write(res.toString());
+    break;
+}
 
-  $(document).on("click", ".deleteUser", function () {
-    let userId = $(this).data("id");
-    let currentUserId = userId;
+$(document).ready(function() {
+    getUserDetails();
     
-    if (currentUserId == userId) {
-      notyf.error("You cannot delete your own account!");
-      return;   
-    }
+    // Load missed notifications first
+    loadMissedNotifications();
+    
+    // Then connect SSE for real-time
+    setTimeout(() => initCandidateNotifications(), 500);
+    
+    $("#navDashboard").click(() => showCandidateDashboard());
+    $("#logoutBtn").click(() => logoutUser());
+    showCandidateDashboard();
+});
+
+/**
+ * Load notifications that arrived while user was offline
+ */
+function loadMissedNotifications() {
+    ajaxGet("getUnreadNotifications", {}, function(res) {
+        if (res.status == "success" && res.notifications && res.notifications.length > 0) {
+            let count = res.unread_count || res.notifications.length;
+            
+            // Show count in badge
+            $("#badgeAssessment").text(count).removeClass("hidden");
+            
+            // Show summary notification
+            notyf.open({
+                type: "info",
+                message: `You have ${count} unread notification(s)`,
+                duration: 5000
+            });
+            
+            // Optionally show a modal with all notifications
+            showNotificationModal(res.notifications);
+        }
+    });
+}
+
+/**
+ * Show notification modal (optional)
+ */
+function showNotificationModal(notifications) {
+    let html = '<div class="space-y-2">';
+    
+    notifications.forEach(notif => {
+        html += `
+            <div class="border-l-4 border-blue-500 bg-blue-50 p-3 rounded cursor-pointer hover:bg-blue-100"
+                 data-notif-id="${notif.notification_id}"
+                 data-ref-id="${notif.reference_id}"
+                 data-event-type="${notif.event_type}">
+                <p class="font-semibold text-gray-800">${notif.message}</p>
+                <p class="text-xs text-gray-500">${formatDate(notif.created_at)}</p>
+            </div>
+        `;
+    });
+    
+    html += '</div>';
     
     Swal.fire({
-      title: "Delete User?",
-      text: "This action will deactivate the user",
-      icon: "warning",
-      showCancelButton: true,
-      confirmButtonColor: "#dc2626",
-      cancelButtonColor: "#6b7280",
-      confirmButtonText: "Yes, delete",
+        title: "Missed Notifications",
+        html: html,
+        width: '600px',
+        confirmButtonText: "Mark All as Read",
+        showCancelButton: true,
+        cancelButtonText: "Close"
     }).then((result) => {
-      if (result.isConfirmed) {
-        ajaxPost("deleteUser", { userId: userId }, function (res) {
-          if (res.status == "success") {
-            notyf.success(res.message);
-          } else {
-            notyf.error(res.message);
-          }
-          loadUsers(role);
-        });
-      }
+        if (result.isConfirmed) {
+            markAllAsRead();
+        }
     });
-  });
+    
+    // Handle click on notification
+    $(document).on('click', '[data-notif-id]', function() {
+        let notifId = $(this).data('notif-id');
+        let refId = $(this).data('ref-id');
+        let eventType = $(this).data('event-type');
+        
+        // Mark as read
+        markAsRead(notifId);
+        
+        // Navigate based on event type
+        if (eventType == "assessment") {
+            Swal.close();
+            showCandidateDashboard();
+        } else if (eventType == "result") {
+            Swal.close();
+            sessionStorage.setItem("result_candidate_assessment_id", refId);
+            window.location.href = "result.html";
+        }
+    });
 }
+
+function markAsRead(notificationId) {
+    ajaxGet("markNotificationRead", { notification_id: notificationId }, function(res) {
+        if (res.status == "success") {
+            // Update badge count
+            let currentCount = parseInt($("#badgeAssessment").text()) || 0;
+            if (currentCount > 0) {
+                $("#badgeAssessment").text(currentCount - 1);
+                if (currentCount - 1 == 0) {
+                    $("#badgeAssessment").addClass("hidden");
+                }
+            }
+        }
+    });
+}
+
+function markAllAsRead() {
+    ajaxGet("markAllNotificationsRead", {}, function(res) {
+        if (res.status == "success") {
+            $("#badgeAssessment").addClass("hidden").text("0");
+            notyf.success("All notifications marked as read");
+        }
+    });
+}
+```
+
+---
+
+## **Interview Answers**
+
+### **Q: What's the use of SSE if you store in database anyway?**
+
+**Perfect Answer:**
+
+> "Great question! We use a **hybrid approach** - both SSE and database - because they serve different purposes:
+>
+> **SSE (Real-time):**
+> - For **instant notifications** when user is online
+> - Provides **immediate feedback** without page refresh
+> - Better **user experience** - see updates as they happen
+> - **Low latency** - notification appears in milliseconds
+>
+> **Database (Persistent):**
+> - For **offline users** - notifications saved for later
+> - Provides **notification history** - users can review old alerts
+> - Enables **reliable delivery** - guaranteed not to lose notifications
+> - Allows **batch notifications** - see all missed events on login
+>
+> **Why both?**
+> 
+> Think of it like **email + SMS**:
+> - SMS (SSE) = Instant alert if phone is on
+> - Email (Database) = Backup if SMS fails, can check later
+>
+> **Real example:**
+> - Panel creates assessment at 2 PM
+> - Candidate is online → Gets SSE popup instantly ✅
+> - Candidate is offline → Saved in DB, shows when they login at 5 PM ✅
+>
+> Without DB, offline users would **miss critical notifications**. Without SSE, online users would need to **constantly refresh** the page. Together, they provide the **best of both worlds**."
+
+---
+
+### **Q: Why not just use database polling and skip SSE?**
+
+**Answer:**
+
+> "We could use **database polling** (check DB every 10 seconds), but it has significant drawbacks:
+>
+> **Database Polling Approach:**
+> ```javascript
+> setInterval(() => {
+>     ajaxGet("getUnreadNotifications", ...);  // Every 10 seconds
+> }, 10000);
+> ```
+>
+> **Problems:**
+> 1. **Server Load**: 100 users = 100 queries every 10 seconds = 600 queries/minute
+> 2. **Latency**: Up to 10-second delay before notification appears
+> 3. **Battery Drain**: Constant AJAX requests drain mobile battery
+> 4. **Network Waste**: 99% of polls return "no new data"
+> 5. **Not Scalable**: 1000 users = 6000 queries/minute!
+>
+> **SSE Approach:**
+> - **1 persistent connection** per user (not 6 connections/minute)
+> - **Instant delivery** (0-second latency)
+> - **Server push** only when there's actual data
+> - **Battery efficient** - no constant polling
+> - **Scalable** - 1000 users = 1000 open connections (manageable)
+>
+> **Best Practice:**
+> Use **SSE for real-time** + **DB for persistence** + **Load missed notifications on login**
+>
+> This is how **Slack, Gmail, Facebook** handle notifications!"
+
+---
+
+### **Q: What if 10,000 users are online? Can SSE handle it?**
+
+**Answer:**
+
+> "Good scalability question! SSE can handle **moderate scale** but has limits:
+>
+> **SSE Limitations:**
+> - Each connection = 1 thread (in traditional servlet)
+> - 10,000 users = 10,000 threads = High memory usage
+> - Server may struggle beyond 5,000-10,000 concurrent connections
+>
+> **For Large Scale, we'd upgrade to:**
+>
+> **1. WebSocket (bidirectional)**
+> ```
+> - More efficient than SSE
+> - Better for chat/collaboration
+> - Requires more complex server (Netty, Jetty)
+> ```
+>
+> **2. Message Queue (Redis Pub/Sub, RabbitMQ)**
+> ```
+> - Server publishe
