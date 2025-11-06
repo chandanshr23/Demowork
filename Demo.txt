@@ -1,574 +1,340 @@
-CREATE TABLE m_s_notifications (
-    notification_id INT AUTO_INCREMENT PRIMARY KEY,
-    user_id INT NOT NULL,
-    event_type VARCHAR(50) NOT NULL,  -- 'assessment', 'evaluation', 'result'
-    message TEXT NOT NULL,
-    reference_id INT,  -- assessment_id or candidate_assessment_id
-    is_read BOOLEAN DEFAULT FALSE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    read_at TIMESTAMP NULL,
+comprehensive solution:
+1. First, update the database column if needed
+The questions column in m_s_assessment table should store JSON array format (which it already does based on your code).
+2. Update panelDashboard.html - Add Import Button
+Find the Questions Modal header section and update it:
+html<!-- Questions Modal -->
+<div id="manageQuestionsModal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+  <div class="bg-white w-full max-w-5xl rounded-lg shadow-lg flex flex-col" style="height: 85vh; max-height: 85vh;" >
+    <!-- Header-->
+    <div class="flex items-center justify-between p-4 border-b bg-gray-50 rounded-t-lg" style="flex-shrink: 0;" >
+      <h2 class="text-2xl font-semibold text-gray-800">Questions</h2>
+      <div class="flex gap-2">
+        <button id="btnAddQuestion" class="bg-blue-600 text-white px-3 py-2 rounded hover:bg-blue-700">+ Add Question</button>
+        <button id="btnImportQuestions" class="bg-green-600 text-white px-3 py-2 rounded hover:bg-green-700">📥 Import from Excel</button>
+        <button id="btnDownloadTemplate" class="bg-purple-600 text-white px-3 py-2 rounded hover:bg-purple-700">📄 Download Template</button>
+        <button id="closeQuestionModal" class="bg-gray-500 text-white px-3 py-2 rounded hover:bg-gray-600">Close</button>
+      </div>
+    </div>
+    <!-- Rest of modal content... -->
+3. Add Import Modal to panelDashboard.html
+Add this before the closing </body> tag:
+html<!-- Import Questions Modal -->
+<div id="importQuestionsModal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+  <div class="bg-white w-[600px] rounded-lg shadow-lg p-6">
+    <h3 class="text-xl font-semibold mb-4 text-gray-800">Import Questions from Excel</h3>
     
-    FOREIGN KEY (user_id) REFERENCES m_d_user(user_id),
-    INDEX idx_user_unread (user_id, is_read),
-    INDEX idx_created (created_at)
-);
-public class NotificationManager {
-    private static final Logger logger = LogManager.getLogger(NotificationManager.class);
-    private static final Map<Integer, ConnectionInfo> connections = new ConcurrentHashMap<>();
-
-    public static class ConnectionInfo {
-        PrintWriter writer;
-        String role;
-        public ConnectionInfo(PrintWriter writer, String role) {
-            this.writer = writer;
-            this.role = role;
-        }
-    }
-
-    // Existing methods...
-    public static void addConnection(int userId, String role, PrintWriter writer) {
-        connections.put(userId, new ConnectionInfo(writer, role));
-        logger.info("Added SSE connection for user: " + userId + " (" + role + ")");
-    }
-
-    public static void removeConnection(int userId) {
-        ConnectionInfo conn = connections.remove(userId);
-        if (conn != null) {
-            try { conn.writer.close(); } catch (Exception ignored) {}
-        }
-        logger.info("Removed SSE connection for user: " + userId);
-    }
-
-    /**
-     * NEW METHOD: Send notification with DB persistence
-     * This ensures notification is saved even if user is offline
-     */
-    public static void sendNotification(int userId, String eventType, String message, Integer referenceId) {
-        // STEP 1: Save to database FIRST (persistent)
-        boolean savedToDb = saveNotificationToDatabase(userId, eventType, message, referenceId);
-        
-        if (!savedToDb) {
-            logger.error("Failed to save notification to database for user: " + userId);
-            return;  // Don't send SSE if DB save failed
-        }
-
-        // STEP 2: Try to send via SSE (real-time, if online)
-        ConnectionInfo conn = connections.get(userId);
-        if (conn != null) {
-            try {
-                conn.writer.write("event: " + eventType + "\n");
-                conn.writer.write("data: " + message + "\n\n");
-                conn.writer.flush();
-                logger.info("Sent SSE to user " + userId + ": " + message);
-            } catch (Exception e) {
-                logger.error("Failed to send SSE to user " + userId + ", but saved in DB");
-                removeConnection(userId);
-            }
-        } else {
-            logger.info("User " + userId + " offline. Notification saved in DB for later.");
-        }
-    }
-
-    /**
-     * Save notification to database
-     */
-    private static boolean saveNotificationToDatabase(int userId, String eventType, 
-                                                       String message, Integer referenceId) {
-        Connection conn = null;
-        PreparedStatement pstmt = null;
-        try {
-            conn = DBConnector.getConnection();
-            String sql = "INSERT INTO m_s_notifications (user_id, event_type, message, reference_id) " +
-                        "VALUES (?, ?, ?, ?)";
-            pstmt = conn.prepareStatement(sql);
-            pstmt.setInt(1, userId);
-            pstmt.setString(2, eventType);
-            pstmt.setString(3, message);
-            if (referenceId != null) {
-                pstmt.setInt(4, referenceId);
-            } else {
-                pstmt.setNull(4, java.sql.Types.INTEGER);
-            }
-            
-            int rows = pstmt.executeUpdate();
-            logger.info("Saved notification to DB for user " + userId);
-            return rows > 0;
-            
-        } catch (Exception e) {
-            logger.error("Error saving notification to DB: " + e.getMessage());
-            return false;
-        } finally {
-            try {
-                if (pstmt != null) pstmt.close();
-                if (conn != null) conn.close();
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }
-    }
-
-    /**
-     * Get unread notification count for user
-     */
-    public static int getUnreadCount(int userId) {
-        Connection conn = null;
-        PreparedStatement pstmt = null;
-        ResultSet rs = null;
-        try {
-            conn = DBConnector.getConnection();
-            String sql = "SELECT COUNT(*) as count FROM m_s_notifications " +
-                        "WHERE user_id = ? AND is_read = FALSE";
-            pstmt = conn.prepareStatement(sql);
-            pstmt.setInt(1, userId);
-            rs = pstmt.executeQuery();
-            
-            if (rs.next()) {
-                return rs.getInt("count");
-            }
-            return 0;
-            
-        } catch (Exception e) {
-            logger.error("Error getting unread count: " + e.getMessage());
-            return 0;
-        } finally {
-            try {
-                if (rs != null) rs.close();
-                if (pstmt != null) pstmt.close();
-                if (conn != null) conn.close();
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }
-    }
-
-    /**
-     * Get all unread notifications for user
-     */
-    public static JsonArray getUnreadNotifications(int userId) {
-        JsonArray notifications = new JsonArray();
-        Connection conn = null;
-        PreparedStatement pstmt = null;
-        ResultSet rs = null;
-        
-        try {
-            conn = DBConnector.getConnection();
-            String sql = "SELECT notification_id, event_type, message, reference_id, created_at " +
-                        "FROM m_s_notifications WHERE user_id = ? AND is_read = FALSE " +
-                        "ORDER BY created_at DESC LIMIT 20";
-            pstmt = conn.prepareStatement(sql);
-            pstmt.setInt(1, userId);
-            rs = pstmt.executeQuery();
-            
-            while (rs.next()) {
-                JsonObject notif = new JsonObject();
-                notif.addProperty("notification_id", rs.getInt("notification_id"));
-                notif.addProperty("event_type", rs.getString("event_type"));
-                notif.addProperty("message", rs.getString("message"));
-                notif.addProperty("reference_id", rs.getInt("reference_id"));
-                notif.addProperty("created_at", rs.getString("created_at"));
-                notifications.add(notif);
-            }
-            
-        } catch (Exception e) {
-            logger.error("Error fetching notifications: " + e.getMessage());
-        } finally {
-            try {
-                if (rs != null) rs.close();
-                if (pstmt != null) pstmt.close();
-                if (conn != null) conn.close();
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }
-        
-        return notifications;
-    }
-
-    /**
-     * Mark notification as read
-     */
-    public static boolean markAsRead(int notificationId) {
-        Connection conn = null;
-        PreparedStatement pstmt = null;
-        try {
-            conn = DBConnector.getConnection();
-            String sql = "UPDATE m_s_notifications SET is_read = TRUE, read_at = NOW() " +
-                        "WHERE notification_id = ?";
-            pstmt = conn.prepareStatement(sql);
-            pstmt.setInt(1, notificationId);
-            
-            int rows = pstmt.executeUpdate();
-            return rows > 0;
-            
-        } catch (Exception e) {
-            logger.error("Error marking notification as read: " + e.getMessage());
-            return false;
-        } finally {
-            try {
-                if (pstmt != null) pstmt.close();
-                if (conn != null) conn.close();
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }
-    }
-
-    /**
-     * Mark all notifications as read for user
-     */
-    public static boolean markAllAsRead(int userId) {
-        Connection conn = null;
-        PreparedStatement pstmt = null;
-        try {
-            conn = DBConnector.getConnection();
-            String sql = "UPDATE m_s_notifications SET is_read = TRUE, read_at = NOW() " +
-                        "WHERE user_id = ? AND is_read = FALSE";
-            pstmt = conn.prepareStatement(sql);
-            pstmt.setInt(1, userId);
-            
-            int rows = pstmt.executeUpdate();
-            return rows > 0;
-            
-        } catch (Exception e) {
-            logger.error("Error marking all as read: " + e.getMessage());
-            return false;
-        } finally {
-            try {
-                if (pstmt != null) pstmt.close();
-                if (conn != null) conn.close();
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }
-    }
-}
-
-// OLD CODE:
-NotificationManager.sendEvent(candidateId, "assessment", "New assessment added");
-
-// NEW CODE:
-NotificationManager.sendNotification(
-    candidateId,           // userId
-    "assessment",          // eventType
-    "New assessment \"" + assessmentName + "\" added by " + panelName,  // message
-    assessmentId           // referenceId (for navigation)
-);
-
-case "addAssessment": {
-    logger.info("Received action addAssessment");
-    int userId = Integer.parseInt(session.getAttribute("userId").toString());
+    <div class="mb-4">
+      <label class="block text-sm font-medium text-gray-700 mb-2">Upload Excel File</label>
+      <input type="file" id="excelFileInput" accept=".xlsx,.xls" 
+             class="w-full border rounded p-2 cursor-pointer">
+      <p class="text-xs text-gray-500 mt-1">Supported formats: .xlsx, .xls</p>
+    </div>
     
-    AssessmentModel a = new AssessmentModel();
-    // ... set properties ...
+    <div class="bg-blue-50 border border-blue-200 rounded p-3 mb-4">
+      <h4 class="font-semibold text-sm mb-2">📋 Excel Format Requirements:</h4>
+      <ul class="text-xs space-y-1 text-gray-700">
+        <li>• <b>Column A:</b> Question Text</li>
+        <li>• <b>Column B:</b> Option A</li>
+        <li>• <b>Column C:</b> Option B</li>
+        <li>• <b>Column D:</b> Option C</li>
+        <li>• <b>Column E:</b> Option D</li>
+        <li>• <b>Column F:</b> Correct Answer (A, B, C, or D)</li>
+        <li>• <b>Column G:</b> Marks (number)</li>
+        <li>• First row should be headers</li>
+      </ul>
+    </div>
     
-    JsonObject result = assessmentService.addAssessment(a);
+    <div id="importPreview" class="hidden mb-4">
+      <h4 class="font-semibold mb-2">Preview (First 3 Questions):</h4>
+      <div id="previewContent" class="max-h-48 overflow-y-auto border rounded p-2 text-xs"></div>
+    </div>
     
-    if ("success".equals(result.get("status").getAsString())) {
-        // Get assessment ID from result or database
-        int assessmentId = result.get("assessment_id").getAsInt();
-        
-        // Notify all candidates
-        JsonObject candidateRes = userService.getCandidatesByPanel(userId);
-        if ("success".equals(candidateRes.get("status").getAsString())) {
-            JsonArray candidates = candidateRes.getAsJsonArray("candidates");
-            
-            for (int i = 0; i < candidates.size(); i++) {
-                JsonObject cand = candidates.get(i).getAsJsonObject();
-                int candidateId = cand.get("user_id").getAsInt();
-                String panelName = cand.get("panel_name").getAsString();
-                
-                // NEW METHOD with DB persistence
-                NotificationManager.sendNotification(
-                    candidateId,
-                    "assessment",
-                    "New assessment \"" + a.getAssessmentName() + "\" assigned by " + panelName,
-                    assessmentId  // Can click to navigate
-                );
-            }
-        }
-    }
-    
-    response.getWriter().write(result.toString());
-    break;
-}
-
-// In MainServlet.java doGet method:
-
-case "getUnreadNotifications": {
-    logger.info("Received action: getUnreadNotifications");
-    JsonObject res = new JsonObject();
-    try {
-        int userId = (int) session.getAttribute("userId");
-        JsonArray notifications = NotificationManager.getUnreadNotifications(userId);
-        int unreadCount = NotificationManager.getUnreadCount(userId);
-        
-        res.addProperty("status", "success");
-        res.add("notifications", notifications);
-        res.addProperty("unread_count", unreadCount);
-        
-    } catch (Exception e) {
-        e.printStackTrace();
-        res.addProperty("status", "error");
-        res.addProperty("message", e.getMessage());
-    }
-    response.getWriter().write(res.toString());
-    break;
-}
-
-case "markNotificationRead": {
-    logger.info("Received action: markNotificationRead");
-    JsonObject res = new JsonObject();
-    try {
-        int notificationId = Integer.parseInt(request.getParameter("notification_id"));
-        boolean success = NotificationManager.markAsRead(notificationId);
-        
-        if (success) {
-            res.addProperty("status", "success");
-        } else {
-            res.addProperty("status", "error");
-            res.addProperty("message", "Failed to mark as read");
-        }
-        
-    } catch (Exception e) {
-        e.printStackTrace();
-        res.addProperty("status", "error");
-        res.addProperty("message", e.getMessage());
-    }
-    response.getWriter().write(res.toString());
-    break;
-}
-
-case "markAllNotificationsRead": {
-    logger.info("Received action: markAllNotificationsRead");
-    JsonObject res = new JsonObject();
-    try {
-        int userId = (int) session.getAttribute("userId");
-        boolean success = NotificationManager.markAllAsRead(userId);
-        
-        if (success) {
-            res.addProperty("status", "success");
-        } else {
-            res.addProperty("status", "error");
-            res.addProperty("message", "Failed to mark all as read");
-        }
-        
-    } catch (Exception e) {
-        e.printStackTrace();
-        res.addProperty("status", "error");
-        res.addProperty("message", e.getMessage());
-    }
-    response.getWriter().write(res.toString());
-    break;
-}
-
-$(document).ready(function() {
-    getUserDetails();
-    
-    // Load missed notifications first
-    loadMissedNotifications();
-    
-    // Then connect SSE for real-time
-    setTimeout(() => initCandidateNotifications(), 500);
-    
-    $("#navDashboard").click(() => showCandidateDashboard());
-    $("#logoutBtn").click(() => logoutUser());
-    showCandidateDashboard();
+    <div class="flex justify-end gap-2">
+      <button type="button" id="cancelImport" class="bg-gray-300 px-4 py-2 rounded">Cancel</button>
+      <button type="button" id="confirmImport" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700" disabled>Import Questions</button>
+    </div>
+  </div>
+</div>
+4. Update panelDashboard.js - Add Import Functionality
+Add this code to handle imports:
+javascript// Import Questions - Button Click
+$("#btnImportQuestions").click(function() {
+    $("#importQuestionsModal").removeClass("hidden");
+    $("#excelFileInput").val("");
+    $("#importPreview").addClass("hidden");
+    $("#confirmImport").prop("disabled", true);
 });
 
-/**
- * Load notifications that arrived while user was offline
- */
-function loadMissedNotifications() {
-    ajaxGet("getUnreadNotifications", {}, function(res) {
-        if (res.status == "success" && res.notifications && res.notifications.length > 0) {
-            let count = res.unread_count || res.notifications.length;
+$("#cancelImport").click(function() {
+    $("#importQuestionsModal").addClass("hidden");
+});
+
+// Download Template
+$("#btnDownloadTemplate").click(function() {
+    downloadExcelTemplate();
+});
+
+// File Upload Handler
+let parsedQuestions = [];
+
+$("#excelFileInput").change(function(e) {
+    let file = e.target.files[0];
+    if (!file) return;
+    
+    let reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            let data = new Uint8Array(e.target.result);
+            let workbook = XLSX.read(data, { type: 'array' });
+            let firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+            let jsonData = XLSX.utils.sheet_to_json(firstSheet);
             
-            // Show count in badge
-            $("#badgeAssessment").text(count).removeClass("hidden");
+            parsedQuestions = parseExcelQuestions(jsonData);
             
-            // Show summary notification
-            notyf.open({
-                type: "info",
-                message: `You have ${count} unread notification(s)`,
-                duration: 5000
-            });
-            
-            // Optionally show a modal with all notifications
-            showNotificationModal(res.notifications);
+            if (parsedQuestions.length > 0) {
+                showImportPreview(parsedQuestions);
+                $("#confirmImport").prop("disabled", false);
+                notyf.success(`Found ${parsedQuestions.length} questions`);
+            } else {
+                notyf.error("No valid questions found in file");
+            }
+        } catch (error) {
+            console.error("Excel parse error:", error);
+            notyf.error("Error reading Excel file");
+        }
+    };
+    reader.readAsArrayBuffer(file);
+});
+
+// Parse Excel Data
+function parseExcelQuestions(jsonData) {
+    let questions = [];
+    
+    jsonData.forEach((row, index) => {
+        // Skip if row is empty
+        if (!row.Question || !row.OptionA) return;
+        
+        let question = {
+            question: String(row.Question || row.question || "").trim(),
+            optionA: String(row.OptionA || row.optionA || row["Option A"] || "").trim(),
+            optionB: String(row.OptionB || row.optionB || row["Option B"] || "").trim(),
+            optionC: String(row.OptionC || row.optionC || row["Option C"] || "").trim(),
+            optionD: String(row.OptionD || row.optionD || row["Option D"] || "").trim(),
+            correctAnswer: String(row.CorrectAnswer || row.correctAnswer || row["Correct Answer"] || "").trim().toUpperCase(),
+            marks: parseInt(row.Marks || row.marks || 1)
+        };
+        
+        // Validate
+        if (question.question && question.optionA && question.optionB && 
+            ["A", "B", "C", "D"].includes(question.correctAnswer)) {
+            questions.push(question);
+        } else {
+            console.warn(`Skipped invalid row ${index + 2}`);
         }
     });
+    
+    return questions;
 }
 
-/**
- * Show notification modal (optional)
- */
-function showNotificationModal(notifications) {
-    let html = '<div class="space-y-2">';
+// Show Preview
+function showImportPreview(questions) {
+    let preview = questions.slice(0, 3);
+    let html = "";
     
-    notifications.forEach(notif => {
-        html += `
-            <div class="border-l-4 border-blue-500 bg-blue-50 p-3 rounded cursor-pointer hover:bg-blue-100"
-                 data-notif-id="${notif.notification_id}"
-                 data-ref-id="${notif.reference_id}"
-                 data-event-type="${notif.event_type}">
-                <p class="font-semibold text-gray-800">${notif.message}</p>
-                <p class="text-xs text-gray-500">${formatDate(notif.created_at)}</p>
-            </div>
-        `;
+    preview.forEach((q, i) => {
+        html += `<div class="mb-2 p-2 bg-gray-50 rounded">
+            <b>Q${i+1}:</b> ${q.question}<br>
+            <span class="text-xs">A) ${q.optionA} | B) ${q.optionB}<br>
+            C) ${q.optionC} | D) ${q.optionD}<br>
+            <span class="text-green-600">Answer: ${q.correctAnswer}</span> | Marks: ${q.marks}</span>
+        </div>`;
     });
     
-    html += '</div>';
+    if (questions.length > 3) {
+        html += `<p class="text-center text-gray-500 text-xs mt-2">...and ${questions.length - 3} more questions</p>`;
+    }
+    
+    $("#previewContent").html(html);
+    $("#importPreview").removeClass("hidden");
+}
+
+// Confirm Import
+$("#confirmImport").click(function() {
+    if (parsedQuestions.length === 0) {
+        notyf.error("No questions to import");
+        return;
+    }
+    
+    let assessmentId = $("#mq_assessment_id").val();
     
     Swal.fire({
-        title: "Missed Notifications",
-        html: html,
-        width: '600px',
-        confirmButtonText: "Mark All as Read",
+        title: "Import Questions?",
+        text: `This will add ${parsedQuestions.length} questions to the assessment.`,
+        icon: "question",
         showCancelButton: true,
-        cancelButtonText: "Close"
+        confirmButtonText: "Yes, Import",
+        confirmButtonColor: "#16a34a"
     }).then((result) => {
         if (result.isConfirmed) {
-            markAllAsRead();
+            importQuestionsToDatabase(assessmentId, parsedQuestions);
+        }
+    });
+});
+
+// Import to Database
+function importQuestionsToDatabase(assessmentId, questions) {
+    // Show loading
+    Swal.fire({
+        title: 'Importing...',
+        html: 'Please wait while questions are being imported',
+        allowOutsideClick: false,
+        didOpen: () => {
+            Swal.showLoading();
         }
     });
     
-    // Handle click on notification
-    $(document).on('click', '[data-notif-id]', function() {
-        let notifId = $(this).data('notif-id');
-        let refId = $(this).data('ref-id');
-        let eventType = $(this).data('event-type');
+    // Get existing questions first
+    ajaxGet("getQuestionsByAssessment", { assessment_id: assessmentId }, function(res) {
+        let existingQuestions = (res.status == "success" && res.questions) ? res.questions : [];
+        let nextId = existingQuestions.length + 1;
         
-        // Mark as read
-        markAsRead(notifId);
+        // Add question IDs
+        let newQuestions = questions.map((q, index) => ({
+            questionId: nextId + index,
+            question: q.question,
+            optionA: q.optionA,
+            optionB: q.optionB,
+            optionC: q.optionC,
+            optionD: q.optionD,
+            correctAnswer: q.correctAnswer,
+            marks: q.marks
+        }));
         
-        // Navigate based on event type
-        if (eventType == "assessment") {
+        // Merge with existing
+        let allQuestions = existingQuestions.concat(newQuestions);
+        
+        // Calculate totals
+        let totalMarks = allQuestions.reduce((sum, q) => sum + (q.marks || 0), 0);
+        
+        // Update database
+        ajaxPost("bulkImportQuestions", {
+            assessment_id: assessmentId,
+            questions: JSON.stringify(allQuestions),
+            total_questions: allQuestions.length,
+            total_marks: totalMarks
+        }, function(response) {
             Swal.close();
-            showCandidateDashboard();
-        } else if (eventType == "result") {
-            Swal.close();
-            sessionStorage.setItem("result_candidate_assessment_id", refId);
-            window.location.href = "result.html";
-        }
-    });
-}
-
-function markAsRead(notificationId) {
-    ajaxGet("markNotificationRead", { notification_id: notificationId }, function(res) {
-        if (res.status == "success") {
-            // Update badge count
-            let currentCount = parseInt($("#badgeAssessment").text()) || 0;
-            if (currentCount > 0) {
-                $("#badgeAssessment").text(currentCount - 1);
-                if (currentCount - 1 == 0) {
-                    $("#badgeAssessment").addClass("hidden");
-                }
+            
+            if (response.status == "success") {
+                notyf.success(`${newQuestions.length} questions imported successfully!`);
+                $("#importQuestionsModal").addClass("hidden");
+                
+                // Reload questions
+                ajaxGet("getQuestionsByAssessment", { assessment_id: assessmentId }, function(res2) {
+                    if (res2.status == "success") {
+                        AssessmentUtils.renderQuestions(res2.questions, assessmentId);
+                    }
+                });
+            } else {
+                notyf.error(response.message || "Import failed");
             }
-        }
+        });
     });
 }
 
-function markAllAsRead() {
-    ajaxGet("markAllNotificationsRead", {}, function(res) {
-        if (res.status == "success") {
-            $("#badgeAssessment").addClass("hidden").text("0");
-            notyf.success("All notifications marked as read");
+// Download Excel Template
+function downloadExcelTemplate() {
+    let template = [
+        {
+            "Question": "What is DevOps?",
+            "OptionA": "Development and Operations",
+            "OptionB": "Department and Operations",
+            "OptionC": "Development and Occupation",
+            "OptionD": "Data and Operations",
+            "CorrectAnswer": "A",
+            "Marks": 1
+        },
+        {
+            "Question": "Which tool is used for version control?",
+            "OptionA": "Docker",
+            "OptionB": "Git",
+            "OptionC": "Jenkins",
+            "OptionD": "Kubernetes",
+            "CorrectAnswer": "B",
+            "Marks": 1
         }
-    });
+    ];
+    
+    let ws = XLSX.utils.json_to_sheet(template);
+    let wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Questions");
+    
+    XLSX.writeFile(wb, "Questions_Template.xlsx");
+    notyf.success("Template downloaded!");
 }
-```
+5. Create Backend Handler - MainServlet.java
+Add this case in the doPost method:
+javacase "bulkImportQuestions": {
+    logger.info("Received action: bulkImportQuestions");
+    JsonObject res = new JsonObject();
+    try {
+        int assessmentId = Integer.parseInt(request.getParameter("assessment_id"));
+        String questionsJson = request.getParameter("questions");
+        int totalQuestions = Integer.parseInt(request.getParameter("total_questions"));
+        int totalMarks = Integer.parseInt(request.getParameter("total_marks"));
+        
+        // Update assessment with new questions
+        Connection conn = DBConnector.getConnection();
+        String sql = "UPDATE m_s_assessment SET questions=?, total_questions=?, total_marks=? WHERE assessment_id=?";
+        PreparedStatement pstmt = conn.prepareStatement(sql);
+        pstmt.setString(1, questionsJson);
+        pstmt.setInt(2, totalQuestions);
+        pstmt.setInt(3, totalMarks);
+        pstmt.setInt(4, assessmentId);
+        
+        int rows = pstmt.executeUpdate();
+        
+        if (rows > 0) {
+            res.addProperty("status", "success");
+            res.addProperty("message", "Questions imported successfully");
+            logger.info("Bulk import successful for assessment " + assessmentId);
+        } else {
+            res.addProperty("status", "error");
+            res.addProperty("message", "Failed to import questions");
+        }
+        
+        pstmt.close();
+        conn.close();
+        
+    } catch (Exception e) {
+        logger.error("Error in bulkImportQuestions", e);
+        res.addProperty("status", "error");
+        res.addProperty("message", "Server error: " + e.getMessage());
+    }
+    response.getWriter().write(res.toString());
+    break;
+}
+6. Add SheetJS Library Reference
+In panelDashboard.html, add this in the <head> section:
+html<!-- SheetJS for Excel Processing -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+Usage Instructions:
 
----
+Click "Manage Questions" on any assessment
+Click "Download Template" to get sample Excel format
+Fill in your questions following the template structure
+Click "Import from Excel" and select your file
+Preview will show first 3 questions
+Click "Import Questions" to add them to the database
 
-## **Interview Answers**
+The system will:
 
-### **Q: What's the use of SSE if you store in database anyway?**
+✅ Validate each question
+✅ Skip invalid rows
+✅ Auto-assign question IDs
+✅ Update total marks/questions
+✅ Merge with existing questions
+✅ Store in JSON format matching your structure
 
-**Perfect Answer:**
-
-> "Great question! We use a **hybrid approach** - both SSE and database - because they serve different purposes:
->
-> **SSE (Real-time):**
-> - For **instant notifications** when user is online
-> - Provides **immediate feedback** without page refresh
-> - Better **user experience** - see updates as they happen
-> - **Low latency** - notification appears in milliseconds
->
-> **Database (Persistent):**
-> - For **offline users** - notifications saved for later
-> - Provides **notification history** - users can review old alerts
-> - Enables **reliable delivery** - guaranteed not to lose notifications
-> - Allows **batch notifications** - see all missed events on login
->
-> **Why both?**
-> 
-> Think of it like **email + SMS**:
-> - SMS (SSE) = Instant alert if phone is on
-> - Email (Database) = Backup if SMS fails, can check later
->
-> **Real example:**
-> - Panel creates assessment at 2 PM
-> - Candidate is online → Gets SSE popup instantly ✅
-> - Candidate is offline → Saved in DB, shows when they login at 5 PM ✅
->
-> Without DB, offline users would **miss critical notifications**. Without SSE, online users would need to **constantly refresh** the page. Together, they provide the **best of both worlds**."
-
----
-
-### **Q: Why not just use database polling and skip SSE?**
-
-**Answer:**
-
-> "We could use **database polling** (check DB every 10 seconds), but it has significant drawbacks:
->
-> **Database Polling Approach:**
-> ```javascript
-> setInterval(() => {
->     ajaxGet("getUnreadNotifications", ...);  // Every 10 seconds
-> }, 10000);
-> ```
->
-> **Problems:**
-> 1. **Server Load**: 100 users = 100 queries every 10 seconds = 600 queries/minute
-> 2. **Latency**: Up to 10-second delay before notification appears
-> 3. **Battery Drain**: Constant AJAX requests drain mobile battery
-> 4. **Network Waste**: 99% of polls return "no new data"
-> 5. **Not Scalable**: 1000 users = 6000 queries/minute!
->
-> **SSE Approach:**
-> - **1 persistent connection** per user (not 6 connections/minute)
-> - **Instant delivery** (0-second latency)
-> - **Server push** only when there's actual data
-> - **Battery efficient** - no constant polling
-> - **Scalable** - 1000 users = 1000 open connections (manageable)
->
-> **Best Practice:**
-> Use **SSE for real-time** + **DB for persistence** + **Load missed notifications on login**
->
-> This is how **Slack, Gmail, Facebook** handle notifications!"
-
----
-
-### **Q: What if 10,000 users are online? Can SSE handle it?**
-
-**Answer:**
-
-> "Good scalability question! SSE can handle **moderate scale** but has limits:
->
-> **SSE Limitations:**
-> - Each connection = 1 thread (in traditional servlet)
-> - 10,000 users = 10,000 threads = High memory usage
-> - Server may struggle beyond 5,000-10,000 concurrent connections
->
-> **For Large Scale, we'd upgrade to:**
->
-> **1. WebSocket (bidirectional)**
-> ```
-> - More efficient than SSE
-> - Better for chat/collaboration
-> - Requires more complex server (Netty, Jetty)
-> ```
->
-> **2. Message Queue (Redis Pub/Sub, RabbitMQ)**
-> ```
-> - Server publishe
+This solution provides a complete Excel import feature with validation, preview, and proper database storage! 🎯RetryClaude can make mistakes. Please double-check responses.
