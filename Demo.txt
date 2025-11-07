@@ -1,340 +1,449 @@
-comprehensive solution:
-1. First, update the database column if needed
-The questions column in m_s_assessment table should store JSON array format (which it already does based on your code).
-2. Update panelDashboard.html - Add Import Button
-Find the Questions Modal header section and update it:
-html<!-- Questions Modal -->
-<div id="manageQuestionsModal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-  <div class="bg-white w-full max-w-5xl rounded-lg shadow-lg flex flex-col" style="height: 85vh; max-height: 85vh;" >
-    <!-- Header-->
-    <div class="flex items-center justify-between p-4 border-b bg-gray-50 rounded-t-lg" style="flex-shrink: 0;" >
-      <h2 class="text-2xl font-semibold text-gray-800">Questions</h2>
-      <div class="flex gap-2">
-        <button id="btnAddQuestion" class="bg-blue-600 text-white px-3 py-2 rounded hover:bg-blue-700">+ Add Question</button>
-        <button id="btnImportQuestions" class="bg-green-600 text-white px-3 py-2 rounded hover:bg-green-700">📥 Import from Excel</button>
-        <button id="btnDownloadTemplate" class="bg-purple-600 text-white px-3 py-2 rounded hover:bg-purple-700">📄 Download Template</button>
-        <button id="closeQuestionModal" class="bg-gray-500 text-white px-3 py-2 rounded hover:bg-gray-600">Close</button>
-      </div>
-    </div>
-    <!-- Rest of modal content... -->
-3. Add Import Modal to panelDashboard.html
-Add this before the closing </body> tag:
-html<!-- Import Questions Modal -->
-<div id="importQuestionsModal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-  <div class="bg-white w-[600px] rounded-lg shadow-lg p-6">
-    <h3 class="text-xl font-semibold mb-4 text-gray-800">Import Questions from Excel</h3>
-    
-    <div class="mb-4">
-      <label class="block text-sm font-medium text-gray-700 mb-2">Upload Excel File</label>
-      <input type="file" id="excelFileInput" accept=".xlsx,.xls" 
-             class="w-full border rounded p-2 cursor-pointer">
-      <p class="text-xs text-gray-500 mt-1">Supported formats: .xlsx, .xls</p>
-    </div>
-    
-    <div class="bg-blue-50 border border-blue-200 rounded p-3 mb-4">
-      <h4 class="font-semibold text-sm mb-2">📋 Excel Format Requirements:</h4>
-      <ul class="text-xs space-y-1 text-gray-700">
-        <li>• <b>Column A:</b> Question Text</li>
-        <li>• <b>Column B:</b> Option A</li>
-        <li>• <b>Column C:</b> Option B</li>
-        <li>• <b>Column D:</b> Option C</li>
-        <li>• <b>Column E:</b> Option D</li>
-        <li>• <b>Column F:</b> Correct Answer (A, B, C, or D)</li>
-        <li>• <b>Column G:</b> Marks (number)</li>
-        <li>• First row should be headers</li>
-      </ul>
-    </div>
-    
-    <div id="importPreview" class="hidden mb-4">
-      <h4 class="font-semibold mb-2">Preview (First 3 Questions):</h4>
-      <div id="previewContent" class="max-h-48 overflow-y-auto border rounded p-2 text-xs"></div>
-    </div>
-    
-    <div class="flex justify-end gap-2">
-      <button type="button" id="cancelImport" class="bg-gray-300 px-4 py-2 rounded">Cancel</button>
-      <button type="button" id="confirmImport" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700" disabled>Import Questions</button>
+<!-- Replace the logout button section in header with: -->
+<div class="flex items-center space-x-3">
+  <!-- Notification Bell -->
+  <div class="relative">
+    <button id="notificationBtn" class="relative p-2 hover:bg-gray-700 rounded-full transition">
+      <span class="material-icons text-white text-2xl">notifications</span>
+      <span id="notificationBadge" class="hidden absolute -top-1 -right-1 bg-red-600 text-white text-xs rounded-full px-1.5 min-w-[20px] text-center">0</span>
+    </button>
+  </div>
+  
+  <div class="flex items-center space-x-3 cursor-pointer" id="openProfile">
+    <span class="material-icons text-white text-2xl">person</span>
+    <span id="userFullName" class="text-white font-medium"></span>
+  </div>
+  <button id="logoutBtn" class="flex items-center gap-1 bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition">
+    <span class="material-icons">logout</span> Logout
+  </button>
+</div><!-- Replace the logout button section in header with: -->
+<div class="flex items-center space-x-3">
+  <!-- Notification Bell -->
+  <div class="relative">
+    <button id="notificationBtn" class="relative p-2 hover:bg-gray-700 rounded-full transition">
+      <span class="material-icons text-white text-2xl">notifications</span>
+      <span id="notificationBadge" class="hidden absolute -top-1 -right-1 bg-red-600 text-white text-xs rounded-full px-1.5 min-w-[20px] text-center">0</span>
+    </button>
+  </div>
+  
+  <div class="flex items-center space-x-3 cursor-pointer" id="openProfile">
+    <span class="material-icons text-white text-2xl">person</span>
+    <span id="userFullName" class="text-white font-medium"></span>
+  </div>
+  <button id="logoutBtn" class="flex items-center gap-1 bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition">
+    <span class="material-icons">logout</span> Logout
+  </button>
+</div><!-- Replace the logout button section in header with: -->
+<div class="flex items-center space-x-3">
+  <!-- Notification Bell -->
+  <div class="relative">
+    <button id="notificationBtn" class="relative p-2 hover:bg-gray-700 rounded-full transition">
+      <span class="material-icons text-white text-2xl">notifications</span>
+      <span id="notificationBadge" class="hidden absolute -top-1 -right-1 bg-red-600 text-white text-xs rounded-full px-1.5 min-w-[20px] text-center">0</span>
+    </button>
+  </div>
+  
+  <div class="flex items-center space-x-3 cursor-pointer" id="openProfile">
+    <span class="material-icons text-white text-2xl">person</span>
+    <span id="userFullName" class="text-white font-medium"></span>
+  </div>
+  <button id="logoutBtn" class="flex items-center gap-1 bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition">
+    <span class="material-icons">logout</span> Logout
+  </button>
+</div><!-- Notification Dropdown Panel -->
+<div id="notificationPanel" class="hidden fixed top-16 right-6 w-96 bg-white rounded-lg shadow-2xl z-50 max-h-[500px] flex flex-col">
+  <!-- Header -->
+  <div class="p-4 border-b flex justify-between items-center bg-gray-50 rounded-t-lg">
+    <h3 class="font-bold text-gray-800">Notifications</h3>
+    <div class="flex gap-2">
+      <button id="markAllRead" class="text-xs text-blue-600 hover:text-blue-800">Mark all read</button>
+      <button id="closeNotifications" class="text-gray-500 hover:text-gray-700">&times;</button>
     </div>
   </div>
-</div>
-4. Update panelDashboard.js - Add Import Functionality
-Add this code to handle imports:
-javascript// Import Questions - Button Click
-$("#btnImportQuestions").click(function() {
-    $("#importQuestionsModal").removeClass("hidden");
-    $("#excelFileInput").val("");
-    $("#importPreview").addClass("hidden");
-    $("#confirmImport").prop("disabled", true);
-});
+  
+  <!-- Notifications List -->
+  <div id="notificationList" class="overflow-y-auto flex-1 p-2">
+    <div class="text-center text-gray-500 py-8">
+      <span class="material-icons text-4xl mb-2">notifications_none</span>
+      <p>No notifications</p>
+    </div>
+  </div>
+  
+  <!-- Footer -->
+  <div class="p-3 border-t bg-gray-50 rounded-b-lg text-center">
+    <button id="clearAllNotifications" class="text-xs text-red-600 hover:text-red-800">Clear all</button>
+  </div>
+</div>// Add these cases in the doGet switch statement
 
-$("#cancelImport").click(function() {
-    $("#importQuestionsModal").addClass("hidden");
-});
-
-// Download Template
-$("#btnDownloadTemplate").click(function() {
-    downloadExcelTemplate();
-});
-
-// File Upload Handler
-let parsedQuestions = [];
-
-$("#excelFileInput").change(function(e) {
-    let file = e.target.files[0];
-    if (!file) return;
-    
-    let reader = new FileReader();
-    reader.onload = function(e) {
-        try {
-            let data = new Uint8Array(e.target.result);
-            let workbook = XLSX.read(data, { type: 'array' });
-            let firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-            let jsonData = XLSX.utils.sheet_to_json(firstSheet);
-            
-            parsedQuestions = parseExcelQuestions(jsonData);
-            
-            if (parsedQuestions.length > 0) {
-                showImportPreview(parsedQuestions);
-                $("#confirmImport").prop("disabled", false);
-                notyf.success(`Found ${parsedQuestions.length} questions`);
-            } else {
-                notyf.error("No valid questions found in file");
-            }
-        } catch (error) {
-            console.error("Excel parse error:", error);
-            notyf.error("Error reading Excel file");
-        }
-    };
-    reader.readAsArrayBuffer(file);
-});
-
-// Parse Excel Data
-function parseExcelQuestions(jsonData) {
-    let questions = [];
-    
-    jsonData.forEach((row, index) => {
-        // Skip if row is empty
-        if (!row.Question || !row.OptionA) return;
-        
-        let question = {
-            question: String(row.Question || row.question || "").trim(),
-            optionA: String(row.OptionA || row.optionA || row["Option A"] || "").trim(),
-            optionB: String(row.OptionB || row.optionB || row["Option B"] || "").trim(),
-            optionC: String(row.OptionC || row.optionC || row["Option C"] || "").trim(),
-            optionD: String(row.OptionD || row.optionD || row["Option D"] || "").trim(),
-            correctAnswer: String(row.CorrectAnswer || row.correctAnswer || row["Correct Answer"] || "").trim().toUpperCase(),
-            marks: parseInt(row.Marks || row.marks || 1)
-        };
-        
-        // Validate
-        if (question.question && question.optionA && question.optionB && 
-            ["A", "B", "C", "D"].includes(question.correctAnswer)) {
-            questions.push(question);
-        } else {
-            console.warn(`Skipped invalid row ${index + 2}`);
-        }
-    });
-    
-    return questions;
-}
-
-// Show Preview
-function showImportPreview(questions) {
-    let preview = questions.slice(0, 3);
-    let html = "";
-    
-    preview.forEach((q, i) => {
-        html += `<div class="mb-2 p-2 bg-gray-50 rounded">
-            <b>Q${i+1}:</b> ${q.question}<br>
-            <span class="text-xs">A) ${q.optionA} | B) ${q.optionB}<br>
-            C) ${q.optionC} | D) ${q.optionD}<br>
-            <span class="text-green-600">Answer: ${q.correctAnswer}</span> | Marks: ${q.marks}</span>
-        </div>`;
-    });
-    
-    if (questions.length > 3) {
-        html += `<p class="text-center text-gray-500 text-xs mt-2">...and ${questions.length - 3} more questions</p>`;
-    }
-    
-    $("#previewContent").html(html);
-    $("#importPreview").removeClass("hidden");
-}
-
-// Confirm Import
-$("#confirmImport").click(function() {
-    if (parsedQuestions.length === 0) {
-        notyf.error("No questions to import");
-        return;
-    }
-    
-    let assessmentId = $("#mq_assessment_id").val();
-    
-    Swal.fire({
-        title: "Import Questions?",
-        text: `This will add ${parsedQuestions.length} questions to the assessment.`,
-        icon: "question",
-        showCancelButton: true,
-        confirmButtonText: "Yes, Import",
-        confirmButtonColor: "#16a34a"
-    }).then((result) => {
-        if (result.isConfirmed) {
-            importQuestionsToDatabase(assessmentId, parsedQuestions);
-        }
-    });
-});
-
-// Import to Database
-function importQuestionsToDatabase(assessmentId, questions) {
-    // Show loading
-    Swal.fire({
-        title: 'Importing...',
-        html: 'Please wait while questions are being imported',
-        allowOutsideClick: false,
-        didOpen: () => {
-            Swal.showLoading();
-        }
-    });
-    
-    // Get existing questions first
-    ajaxGet("getQuestionsByAssessment", { assessment_id: assessmentId }, function(res) {
-        let existingQuestions = (res.status == "success" && res.questions) ? res.questions : [];
-        let nextId = existingQuestions.length + 1;
-        
-        // Add question IDs
-        let newQuestions = questions.map((q, index) => ({
-            questionId: nextId + index,
-            question: q.question,
-            optionA: q.optionA,
-            optionB: q.optionB,
-            optionC: q.optionC,
-            optionD: q.optionD,
-            correctAnswer: q.correctAnswer,
-            marks: q.marks
-        }));
-        
-        // Merge with existing
-        let allQuestions = existingQuestions.concat(newQuestions);
-        
-        // Calculate totals
-        let totalMarks = allQuestions.reduce((sum, q) => sum + (q.marks || 0), 0);
-        
-        // Update database
-        ajaxPost("bulkImportQuestions", {
-            assessment_id: assessmentId,
-            questions: JSON.stringify(allQuestions),
-            total_questions: allQuestions.length,
-            total_marks: totalMarks
-        }, function(response) {
-            Swal.close();
-            
-            if (response.status == "success") {
-                notyf.success(`${newQuestions.length} questions imported successfully!`);
-                $("#importQuestionsModal").addClass("hidden");
-                
-                // Reload questions
-                ajaxGet("getQuestionsByAssessment", { assessment_id: assessmentId }, function(res2) {
-                    if (res2.status == "success") {
-                        AssessmentUtils.renderQuestions(res2.questions, assessmentId);
-                    }
-                });
-            } else {
-                notyf.error(response.message || "Import failed");
-            }
-        });
-    });
-}
-
-// Download Excel Template
-function downloadExcelTemplate() {
-    let template = [
-        {
-            "Question": "What is DevOps?",
-            "OptionA": "Development and Operations",
-            "OptionB": "Department and Operations",
-            "OptionC": "Development and Occupation",
-            "OptionD": "Data and Operations",
-            "CorrectAnswer": "A",
-            "Marks": 1
-        },
-        {
-            "Question": "Which tool is used for version control?",
-            "OptionA": "Docker",
-            "OptionB": "Git",
-            "OptionC": "Jenkins",
-            "OptionD": "Kubernetes",
-            "CorrectAnswer": "B",
-            "Marks": 1
-        }
-    ];
-    
-    let ws = XLSX.utils.json_to_sheet(template);
-    let wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Questions");
-    
-    XLSX.writeFile(wb, "Questions_Template.xlsx");
-    notyf.success("Template downloaded!");
-}
-5. Create Backend Handler - MainServlet.java
-Add this case in the doPost method:
-javacase "bulkImportQuestions": {
-    logger.info("Received action: bulkImportQuestions");
+case "getAllNotifications": {
+    logger.info("Received action: getAllNotifications");
     JsonObject res = new JsonObject();
     try {
-        int assessmentId = Integer.parseInt(request.getParameter("assessment_id"));
-        String questionsJson = request.getParameter("questions");
-        int totalQuestions = Integer.parseInt(request.getParameter("total_questions"));
-        int totalMarks = Integer.parseInt(request.getParameter("total_marks"));
-        
-        // Update assessment with new questions
-        Connection conn = DBConnector.getConnection();
-        String sql = "UPDATE m_s_assessment SET questions=?, total_questions=?, total_marks=? WHERE assessment_id=?";
-        PreparedStatement pstmt = conn.prepareStatement(sql);
-        pstmt.setString(1, questionsJson);
-        pstmt.setInt(2, totalQuestions);
-        pstmt.setInt(3, totalMarks);
-        pstmt.setInt(4, assessmentId);
-        
-        int rows = pstmt.executeUpdate();
-        
-        if (rows > 0) {
-            res.addProperty("status", "success");
-            res.addProperty("message", "Questions imported successfully");
-            logger.info("Bulk import successful for assessment " + assessmentId);
-        } else {
-            res.addProperty("status", "error");
-            res.addProperty("message", "Failed to import questions");
-        }
-        
-        pstmt.close();
-        conn.close();
-        
+        int userId = (int) session.getAttribute("userId");
+        JsonArray notifications = getAllNotifications(userId);
+        res.addProperty("status", "success");
+        res.add("notifications", notifications);
     } catch (Exception e) {
-        logger.error("Error in bulkImportQuestions", e);
+        logger.error("Error getting all notifications", e);
         res.addProperty("status", "error");
-        res.addProperty("message", "Server error: " + e.getMessage());
+        res.addProperty("message", e.getMessage());
     }
     response.getWriter().write(res.toString());
     break;
 }
-6. Add SheetJS Library Reference
-In panelDashboard.html, add this in the <head> section:
-html<!-- SheetJS for Excel Processing -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-Usage Instructions:
 
-Click "Manage Questions" on any assessment
-Click "Download Template" to get sample Excel format
-Fill in your questions following the template structure
-Click "Import from Excel" and select your file
-Preview will show first 3 questions
-Click "Import Questions" to add them to the database
+case "markNotificationRead": {
+    logger.info("Received action: markNotificationRead");
+    JsonObject res = new JsonObject();
+    try {
+        int notificationId = Integer.parseInt(request.getParameter("notification_id"));
+        markNotificationAsRead(notificationId);
+        res.addProperty("status", "success");
+    } catch (Exception e) {
+        logger.error("Error marking notification as read", e);
+        res.addProperty("status", "error");
+        res.addProperty("message", e.getMessage());
+    }
+    response.getWriter().write(res.toString());
+    break;
+}
 
-The system will:
+case "markAllNotificationsRead": {
+    logger.info("Received action: markAllNotificationsRead");
+    JsonObject res = new JsonObject();
+    try {
+        int userId = (int) session.getAttribute("userId");
+        markAllNotificationsAsRead(userId);
+        res.addProperty("status", "success");
+    } catch (Exception e) {
+        logger.error("Error marking all notifications as read", e);
+        res.addProperty("status", "error");
+        res.addProperty("message", e.getMessage());
+    }
+    response.getWriter().write(res.toString());
+    break;
+}
 
-✅ Validate each question
-✅ Skip invalid rows
-✅ Auto-assign question IDs
-✅ Update total marks/questions
-✅ Merge with existing questions
-✅ Store in JSON format matching your structure
+case "clearAllNotifications": {
+    logger.info("Received action: clearAllNotifications");
+    JsonObject res = new JsonObject();
+    try {
+        int userId = (int) session.getAttribute("userId");
+        clearAllNotifications(userId);
+        res.addProperty("status", "success");
+    } catch (Exception e) {
+        logger.error("Error clearing notifications", e);
+        res.addProperty("status", "error");
+        res.addProperty("message", e.getMessage());
+    }
+    response.getWriter().write(res.toString());
+    break;
+}
 
-This solution provides a complete Excel import feature with validation, preview, and proper database storage! 🎯RetryClaude can make mistakes. Please double-check responses.
+// Add these helper methods at the end of MainServlet class (before closing brace)
+
+private JsonArray getAllNotifications(int userId) {
+    JsonArray notifications = new JsonArray();
+    try (Connection conn = DBConnector.getConnection();
+         PreparedStatement ps = conn.prepareStatement(
+            "SELECT notification_id, event_type, message, is_read, created_at " +
+            "FROM m_s_notifications WHERE user_id=? " +
+            "ORDER BY created_at DESC LIMIT 50"
+         )) {
+        ps.setInt(1, userId);
+        ResultSet rs = ps.executeQuery();
+        
+        while (rs.next()) {
+            JsonObject notif = new JsonObject();
+            notif.addProperty("id", rs.getInt("notification_id"));
+            notif.addProperty("type", rs.getString("event_type"));
+            notif.addProperty("message", rs.getString("message"));
+            notif.addProperty("isRead", rs.getBoolean("is_read"));
+            notif.addProperty("createdAt", rs.getString("created_at"));
+            notifications.add(notif);
+        }
+    } catch (Exception e) {
+        logger.error("Error fetching notifications", e);
+    }
+    return notifications;
+}
+
+private void markNotificationAsRead(int notificationId) {
+    try (Connection conn = DBConnector.getConnection();
+         PreparedStatement ps = conn.prepareStatement(
+            "UPDATE m_s_notifications SET is_read=1, read_at=NOW() WHERE notification_id=?"
+         )) {
+        ps.setInt(1, notificationId);
+        ps.executeUpdate();
+    } catch (Exception e) {
+        logger.error("Error marking notification as read", e);
+    }
+}
+
+private void markAllNotificationsAsRead(int userId) {
+    try (Connection conn = DBConnector.getConnection();
+         PreparedStatement ps = conn.prepareStatement(
+            "UPDATE m_s_notifications SET is_read=1, read_at=NOW() WHERE user_id=? AND is_read=0"
+         )) {
+        ps.setInt(1, userId);
+        ps.executeUpdate();
+    } catch (Exception e) {
+        logger.error("Error marking all notifications as read", e);
+    }
+}
+
+private void clearAllNotifications(int userId) {
+    try (Connection conn = DBConnector.getConnection();
+         PreparedStatement ps = conn.prepareStatement(
+            "DELETE FROM m_s_notifications WHERE user_id=?"
+         )) {
+        ps.setInt(1, userId);
+        ps.executeUpdate();
+    } catch (Exception e) {
+        logger.error("Error clearing notifications", e);
+    }
+}// Notification Panel Management
+let notificationPanel = {
+    isOpen: false,
+    
+    init: function() {
+        this.bindEvents();
+        this.updateBadge();
+    },
+    
+    bindEvents: function() {
+        $("#notificationBtn").click(() => this.toggle());
+        $("#closeNotifications").click(() => this.close());
+        $("#markAllRead").click(() => this.markAllRead());
+        $("#clearAllNotifications").click(() => this.clearAll());
+        
+        // Close when clicking outside
+        $(document).click(function(e) {
+            if (!$(e.target).closest('#notificationBtn, #notificationPanel').length) {
+                notificationPanel.close();
+            }
+        });
+    },
+    
+    toggle: function() {
+        if (this.isOpen) {
+            this.close();
+        } else {
+            this.open();
+        }
+    },
+    
+    open: function() {
+        this.isOpen = true;
+        $("#notificationPanel").removeClass("hidden");
+        this.loadNotifications();
+    },
+    
+    close: function() {
+        this.isOpen = false;
+        $("#notificationPanel").addClass("hidden");
+    },
+    
+    loadNotifications: function() {
+        ajaxGet("getAllNotifications", {}, (res) => {
+            if (res.status == "success") {
+                this.renderNotifications(res.notifications);
+            }
+        });
+    },
+    
+    renderNotifications: function(notifications) {
+        let html = "";
+        
+        if (!notifications || notifications.length == 0) {
+            html = `<div class="text-center text-gray-500 py-8">
+                <span class="material-icons text-4xl mb-2">notifications_none</span>
+                <p>No notifications</p>
+            </div>`;
+        } else {
+            notifications.forEach(notif => {
+                let typeIcon = this.getTypeIcon(notif.type);
+                let typeColor = this.getTypeColor(notif.type);
+                let readClass = notif.isRead ? "bg-white" : "bg-blue-50";
+                let timeAgo = this.getTimeAgo(notif.createdAt);
+                
+                html += `
+                    <div class="notification-item ${readClass} p-3 mb-2 rounded border hover:shadow-sm transition cursor-pointer" 
+                         data-id="${notif.id}" data-read="${notif.isRead}">
+                        <div class="flex items-start gap-2">
+                            <span class="material-icons ${typeColor} text-sm mt-1">${typeIcon}</span>
+                            <div class="flex-1">
+                                <p class="text-sm text-gray-800">${notif.message}</p>
+                                <p class="text-xs text-gray-500 mt-1">${timeAgo}</p>
+                            </div>
+                            ${!notif.isRead ? '<span class="w-2 h-2 bg-blue-600 rounded-full"></span>' : ''}
+                        </div>
+                    </div>
+                `;
+            });
+        }
+        
+        $("#notificationList").html(html);
+        
+        // Click handler for individual notifications
+        $(".notification-item").click(function() {
+            let id = $(this).data("id");
+            let isRead = $(this).data("read");
+            
+            if (!isRead) {
+                notificationPanel.markAsRead(id);
+            }
+        });
+    },
+    
+    getTypeIcon: function(type) {
+        switch(type) {
+            case "assessment": return "assignment";
+            case "candidate": return "person_add";
+            case "evaluation": return "rate_review";
+            default: return "notifications";
+        }
+    },
+    
+    getTypeColor: function(type) {
+        switch(type) {
+            case "assessment": return "text-blue-600";
+            case "candidate": return "text-green-600";
+            case "evaluation": return "text-orange-600";
+            default: return "text-gray-600";
+        }
+    },
+    
+    getTimeAgo: function(dateString) {
+        let now = new Date();
+        let past = new Date(dateString);
+        let diffMs = now - past;
+        let diffMins = Math.floor(diffMs / 60000);
+        
+        if (diffMins < 1) return "Just now";
+        if (diffMins < 60) return `${diffMins}m ago`;
+        
+        let diffHours = Math.floor(diffMins / 60);
+        if (diffHours < 24) return `${diffHours}h ago`;
+        
+        let diffDays = Math.floor(diffHours / 24);
+        if (diffDays < 7) return `${diffDays}d ago`;
+        
+        return past.toLocaleDateString();
+    },
+    
+    markAsRead: function(notificationId) {
+        ajaxGet("markNotificationRead", { notification_id: notificationId }, (res) => {
+            if (res.status == "success") {
+                this.loadNotifications();
+                this.updateBadge();
+            }
+        });
+    },
+    
+    markAllRead: function() {
+        ajaxGet("markAllNotificationsRead", {}, (res) => {
+            if (res.status == "success") {
+                notyf.success("All notifications marked as read");
+                this.loadNotifications();
+                this.updateBadge();
+            }
+        });
+    },
+    
+    clearAll: function() {
+        Swal.fire({
+            title: "Clear All Notifications?",
+            text: "This action cannot be undone",
+            icon: "warning",
+            showCancelButton: true,
+            confirmButtonColor: "#dc2626",
+            confirmButtonText: "Yes, clear all"
+        }).then((result) => {
+            if (result.isConfirmed) {
+                ajaxGet("clearAllNotifications", {}, (res) => {
+                    if (res.status == "success") {
+                        notyf.success("All notifications cleared");
+                        this.loadNotifications();
+                        this.updateBadge();
+                    }
+                });
+            }
+        });
+    },
+    
+    updateBadge: function() {
+        ajaxGet("getUnreadCount", {}, (res) => {
+            if (res.status == "success") {
+                let count = res.count || 0;
+                if (count > 0) {
+                    $("#notificationBadge").text(count).removeClass("hidden");
+                } else {
+                    $("#notificationBadge").addClass("hidden");
+                }
+            }
+        });
+    },
+    
+    addNotification: function(message, type) {
+        // Silently add to badge count
+        let currentCount = parseInt($("#notificationBadge").text() || "0");
+        $("#notificationBadge").text(currentCount + 1).removeClass("hidden");
+        
+        // Reload if panel is open
+        if (this.isOpen) {
+            this.loadNotifications();
+        }
+    }
+};
+
+// Initialize on document ready
+$(document).ready(function() {
+    notificationPanel.init();
+});// Replace initNotifications or add if not present
+function initNotifications() {
+    // Initialize notification panel
+    notificationPanel.init();
+    
+    // SSE for real-time notifications (keep existing SSE code but modify)
+    let eventSource = new EventSource("NotificationServlet");
+    
+    eventSource.addEventListener("candidate", (e) => {
+        notificationPanel.addNotification(e.data, "candidate");
+    });
+    
+    eventSource.addEventListener("evaluation", (e) => {
+        notificationPanel.addNotification(e.data, "evaluation");
+    });
+    
+    eventSource.onerror = () => {
+        setTimeout(() => initNotifications(), 5000);
+    };
+}function initCandidateNotifications() {
+    notificationPanel.init();
+    
+    let eventSource = new EventSource("NotificationServlet");
+    
+    eventSource.addEventListener("assessment", (e) => {
+        notificationPanel.addNotification(e.data, "assessment");
+    });
+    
+    eventSource.onerror = () => {
+        setTimeout(() => initCandidateNotifications(), 5000);
+    };
+}function initNotifications() {
+    notificationPanel.init();
+    
+    const eventSource = new EventSource("NotificationServlet");
+    
+    eventSource.addEventListener("candidate", (e) => {
+        notificationPanel.addNotification(e.data, "candidate");
+    });
+    
+    eventSource.addEventListener("evaluation", (e) => {
+        notificationPanel.addNotification(e.data, "evaluation");
+    });
+    
+    eventSource.onerror = () => {
+        setTimeout(initNotifications, 5000);
+    };
+}
