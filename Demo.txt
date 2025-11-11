@@ -1,449 +1,222 @@
-<!-- Replace the logout button section in header with: -->
-<div class="flex items-center space-x-3">
-  <!-- Notification Bell -->
-  <div class="relative">
-    <button id="notificationBtn" class="relative p-2 hover:bg-gray-700 rounded-full transition">
-      <span class="material-icons text-white text-2xl">notifications</span>
-      <span id="notificationBadge" class="hidden absolute -top-1 -right-1 bg-red-600 text-white text-xs rounded-full px-1.5 min-w-[20px] text-center">0</span>
-    </button>
-  </div>
-  
-  <div class="flex items-center space-x-3 cursor-pointer" id="openProfile">
-    <span class="material-icons text-white text-2xl">person</span>
-    <span id="userFullName" class="text-white font-medium"></span>
-  </div>
-  <button id="logoutBtn" class="flex items-center gap-1 bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition">
-    <span class="material-icons">logout</span> Logout
-  </button>
-</div><!-- Replace the logout button section in header with: -->
-<div class="flex items-center space-x-3">
-  <!-- Notification Bell -->
-  <div class="relative">
-    <button id="notificationBtn" class="relative p-2 hover:bg-gray-700 rounded-full transition">
-      <span class="material-icons text-white text-2xl">notifications</span>
-      <span id="notificationBadge" class="hidden absolute -top-1 -right-1 bg-red-600 text-white text-xs rounded-full px-1.5 min-w-[20px] text-center">0</span>
-    </button>
-  </div>
-  
-  <div class="flex items-center space-x-3 cursor-pointer" id="openProfile">
-    <span class="material-icons text-white text-2xl">person</span>
-    <span id="userFullName" class="text-white font-medium"></span>
-  </div>
-  <button id="logoutBtn" class="flex items-center gap-1 bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition">
-    <span class="material-icons">logout</span> Logout
-  </button>
-</div><!-- Replace the logout button section in header with: -->
-<div class="flex items-center space-x-3">
-  <!-- Notification Bell -->
-  <div class="relative">
-    <button id="notificationBtn" class="relative p-2 hover:bg-gray-700 rounded-full transition">
-      <span class="material-icons text-white text-2xl">notifications</span>
-      <span id="notificationBadge" class="hidden absolute -top-1 -right-1 bg-red-600 text-white text-xs rounded-full px-1.5 min-w-[20px] text-center">0</span>
-    </button>
-  </div>
-  
-  <div class="flex items-center space-x-3 cursor-pointer" id="openProfile">
-    <span class="material-icons text-white text-2xl">person</span>
-    <span id="userFullName" class="text-white font-medium"></span>
-  </div>
-  <button id="logoutBtn" class="flex items-center gap-1 bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition">
-    <span class="material-icons">logout</span> Logout
-  </button>
-</div><!-- Notification Dropdown Panel -->
-<div id="notificationPanel" class="hidden fixed top-16 right-6 w-96 bg-white rounded-lg shadow-2xl z-50 max-h-[500px] flex flex-col">
-  <!-- Header -->
-  <div class="p-4 border-b flex justify-between items-center bg-gray-50 rounded-t-lg">
-    <h3 class="font-bold text-gray-800">Notifications</h3>
-    <div class="flex gap-2">
-      <button id="markAllRead" class="text-xs text-blue-600 hover:text-blue-800">Mark all read</button>
-      <button id="closeNotifications" class="text-gray-500 hover:text-gray-700">&times;</button>
-    </div>
-  </div>
-  
-  <!-- Notifications List -->
-  <div id="notificationList" class="overflow-y-auto flex-1 p-2">
-    <div class="text-center text-gray-500 py-8">
-      <span class="material-icons text-4xl mb-2">notifications_none</span>
-      <p>No notifications</p>
-    </div>
-  </div>
-  
-  <!-- Footer -->
-  <div class="p-3 border-t bg-gray-50 rounded-b-lg text-center">
-    <button id="clearAllNotifications" class="text-xs text-red-600 hover:text-red-800">Clear all</button>
-  </div>
-</div>// Add these cases in the doGet switch statement
+package com.recruitement.util;
 
-case "getAllNotifications": {
-    logger.info("Received action: getAllNotifications");
-    JsonObject res = new JsonObject();
-    try {
-        int userId = (int) session.getAttribute("userId");
-        JsonArray notifications = getAllNotifications(userId);
-        res.addProperty("status", "success");
-        res.add("notifications", notifications);
-    } catch (Exception e) {
-        logger.error("Error getting all notifications", e);
-        res.addProperty("status", "error");
-        res.addProperty("message", e.getMessage());
-    }
-    response.getWriter().write(res.toString());
-    break;
-}
+import java.util.Properties;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
-case "markNotificationRead": {
-    logger.info("Received action: markNotificationRead");
-    JsonObject res = new JsonObject();
-    try {
-        int notificationId = Integer.parseInt(request.getParameter("notification_id"));
-        markNotificationAsRead(notificationId);
-        res.addProperty("status", "success");
-    } catch (Exception e) {
-        logger.error("Error marking notification as read", e);
-        res.addProperty("status", "error");
-        res.addProperty("message", e.getMessage());
-    }
-    response.getWriter().write(res.toString());
-    break;
-}
+import jakarta.mail.Authenticator;
+import jakarta.mail.Message;
+import jakarta.mail.MessagingException;
+import jakarta.mail.PasswordAuthentication;
+import jakarta.mail.Session;
+import jakarta.mail.Transport;
+import jakarta.mail.internet.InternetAddress;
+import jakarta.mail.internet.MimeMessage;
 
-case "markAllNotificationsRead": {
-    logger.info("Received action: markAllNotificationsRead");
-    JsonObject res = new JsonObject();
-    try {
-        int userId = (int) session.getAttribute("userId");
-        markAllNotificationsAsRead(userId);
-        res.addProperty("status", "success");
-    } catch (Exception e) {
-        logger.error("Error marking all notifications as read", e);
-        res.addProperty("status", "error");
-        res.addProperty("message", e.getMessage());
-    }
-    response.getWriter().write(res.toString());
-    break;
-}
+public class EmailUtil {
 
-case "clearAllNotifications": {
-    logger.info("Received action: clearAllNotifications");
-    JsonObject res = new JsonObject();
-    try {
-        int userId = (int) session.getAttribute("userId");
-        clearAllNotifications(userId);
-        res.addProperty("status", "success");
-    } catch (Exception e) {
-        logger.error("Error clearing notifications", e);
-        res.addProperty("status", "error");
-        res.addProperty("message", e.getMessage());
-    }
-    response.getWriter().write(res.toString());
-    break;
-}
-
-// Add these helper methods at the end of MainServlet class (before closing brace)
-
-private JsonArray getAllNotifications(int userId) {
-    JsonArray notifications = new JsonArray();
-    try (Connection conn = DBConnector.getConnection();
-         PreparedStatement ps = conn.prepareStatement(
-            "SELECT notification_id, event_type, message, is_read, created_at " +
-            "FROM m_s_notifications WHERE user_id=? " +
-            "ORDER BY created_at DESC LIMIT 50"
-         )) {
-        ps.setInt(1, userId);
-        ResultSet rs = ps.executeQuery();
-        
-        while (rs.next()) {
-            JsonObject notif = new JsonObject();
-            notif.addProperty("id", rs.getInt("notification_id"));
-            notif.addProperty("type", rs.getString("event_type"));
-            notif.addProperty("message", rs.getString("message"));
-            notif.addProperty("isRead", rs.getBoolean("is_read"));
-            notif.addProperty("createdAt", rs.getString("created_at"));
-            notifications.add(notif);
-        }
-    } catch (Exception e) {
-        logger.error("Error fetching notifications", e);
-    }
-    return notifications;
-}
-
-private void markNotificationAsRead(int notificationId) {
-    try (Connection conn = DBConnector.getConnection();
-         PreparedStatement ps = conn.prepareStatement(
-            "UPDATE m_s_notifications SET is_read=1, read_at=NOW() WHERE notification_id=?"
-         )) {
-        ps.setInt(1, notificationId);
-        ps.executeUpdate();
-    } catch (Exception e) {
-        logger.error("Error marking notification as read", e);
-    }
-}
-
-private void markAllNotificationsAsRead(int userId) {
-    try (Connection conn = DBConnector.getConnection();
-         PreparedStatement ps = conn.prepareStatement(
-            "UPDATE m_s_notifications SET is_read=1, read_at=NOW() WHERE user_id=? AND is_read=0"
-         )) {
-        ps.setInt(1, userId);
-        ps.executeUpdate();
-    } catch (Exception e) {
-        logger.error("Error marking all notifications as read", e);
-    }
-}
-
-private void clearAllNotifications(int userId) {
-    try (Connection conn = DBConnector.getConnection();
-         PreparedStatement ps = conn.prepareStatement(
-            "DELETE FROM m_s_notifications WHERE user_id=?"
-         )) {
-        ps.setInt(1, userId);
-        ps.executeUpdate();
-    } catch (Exception e) {
-        logger.error("Error clearing notifications", e);
-    }
-}// Notification Panel Management
-let notificationPanel = {
-    isOpen: false,
+    private static final Logger logger = LogManager.getLogger(EmailUtil.class);
     
-    init: function() {
-        this.bindEvents();
-        this.updateBadge();
-    },
+    // Email configuration - Consider moving to properties file
+    private static final String FROM_EMAIL = "your-email@company.com"; 
+    private static final String PASSWORD = "your-app-password";  
+    private static final String SMTP_HOST = "smtp.office365.com"; // or smtp.gmail.com
+    private static final String SMTP_PORT = "587";
     
-    bindEvents: function() {
-        $("#notificationBtn").click(() => this.toggle());
-        $("#closeNotifications").click(() => this.close());
-        $("#markAllRead").click(() => this.markAllRead());
-        $("#clearAllNotifications").click(() => this.clearAll());
-        
-        // Close when clicking outside
-        $(document).click(function(e) {
-            if (!$(e.target).closest('#notificationBtn, #notificationPanel').length) {
-                notificationPanel.close();
+    /**
+     * Send a plain text email
+     */
+    public static boolean sendEmail(String to, String subject, String body) {
+        Properties props = new Properties();
+        props.put("mail.smtp.auth", "true"); 
+        props.put("mail.smtp.starttls.enable", "true");
+        props.put("mail.smtp.host", SMTP_HOST);
+        props.put("mail.smtp.port", SMTP_PORT);
+
+        Session session = Session.getInstance(props, new Authenticator() {
+            protected PasswordAuthentication getPasswordAuthentication() {
+                return new PasswordAuthentication(FROM_EMAIL, PASSWORD);
             }
         });
-    },
-    
-    toggle: function() {
-        if (this.isOpen) {
-            this.close();
-        } else {
-            this.open();
-        }
-    },
-    
-    open: function() {
-        this.isOpen = true;
-        $("#notificationPanel").removeClass("hidden");
-        this.loadNotifications();
-    },
-    
-    close: function() {
-        this.isOpen = false;
-        $("#notificationPanel").addClass("hidden");
-    },
-    
-    loadNotifications: function() {
-        ajaxGet("getAllNotifications", {}, (res) => {
-            if (res.status == "success") {
-                this.renderNotifications(res.notifications);
-            }
-        });
-    },
-    
-    renderNotifications: function(notifications) {
-        let html = "";
-        
-        if (!notifications || notifications.length == 0) {
-            html = `<div class="text-center text-gray-500 py-8">
-                <span class="material-icons text-4xl mb-2">notifications_none</span>
-                <p>No notifications</p>
-            </div>`;
-        } else {
-            notifications.forEach(notif => {
-                let typeIcon = this.getTypeIcon(notif.type);
-                let typeColor = this.getTypeColor(notif.type);
-                let readClass = notif.isRead ? "bg-white" : "bg-blue-50";
-                let timeAgo = this.getTimeAgo(notif.createdAt);
-                
-                html += `
-                    <div class="notification-item ${readClass} p-3 mb-2 rounded border hover:shadow-sm transition cursor-pointer" 
-                         data-id="${notif.id}" data-read="${notif.isRead}">
-                        <div class="flex items-start gap-2">
-                            <span class="material-icons ${typeColor} text-sm mt-1">${typeIcon}</span>
-                            <div class="flex-1">
-                                <p class="text-sm text-gray-800">${notif.message}</p>
-                                <p class="text-xs text-gray-500 mt-1">${timeAgo}</p>
-                            </div>
-                            ${!notif.isRead ? '<span class="w-2 h-2 bg-blue-600 rounded-full"></span>' : ''}
-                        </div>
-                    </div>
-                `;
-            });
-        }
-        
-        $("#notificationList").html(html);
-        
-        // Click handler for individual notifications
-        $(".notification-item").click(function() {
-            let id = $(this).data("id");
-            let isRead = $(this).data("read");
-            
-            if (!isRead) {
-                notificationPanel.markAsRead(id);
-            }
-        });
-    },
-    
-    getTypeIcon: function(type) {
-        switch(type) {
-            case "assessment": return "assignment";
-            case "candidate": return "person_add";
-            case "evaluation": return "rate_review";
-            default: return "notifications";
-        }
-    },
-    
-    getTypeColor: function(type) {
-        switch(type) {
-            case "assessment": return "text-blue-600";
-            case "candidate": return "text-green-600";
-            case "evaluation": return "text-orange-600";
-            default: return "text-gray-600";
-        }
-    },
-    
-    getTimeAgo: function(dateString) {
-        let now = new Date();
-        let past = new Date(dateString);
-        let diffMs = now - past;
-        let diffMins = Math.floor(diffMs / 60000);
-        
-        if (diffMins < 1) return "Just now";
-        if (diffMins < 60) return `${diffMins}m ago`;
-        
-        let diffHours = Math.floor(diffMins / 60);
-        if (diffHours < 24) return `${diffHours}h ago`;
-        
-        let diffDays = Math.floor(diffHours / 24);
-        if (diffDays < 7) return `${diffDays}d ago`;
-        
-        return past.toLocaleDateString();
-    },
-    
-    markAsRead: function(notificationId) {
-        ajaxGet("markNotificationRead", { notification_id: notificationId }, (res) => {
-            if (res.status == "success") {
-                this.loadNotifications();
-                this.updateBadge();
-            }
-        });
-    },
-    
-    markAllRead: function() {
-        ajaxGet("markAllNotificationsRead", {}, (res) => {
-            if (res.status == "success") {
-                notyf.success("All notifications marked as read");
-                this.loadNotifications();
-                this.updateBadge();
-            }
-        });
-    },
-    
-    clearAll: function() {
-        Swal.fire({
-            title: "Clear All Notifications?",
-            text: "This action cannot be undone",
-            icon: "warning",
-            showCancelButton: true,
-            confirmButtonColor: "#dc2626",
-            confirmButtonText: "Yes, clear all"
-        }).then((result) => {
-            if (result.isConfirmed) {
-                ajaxGet("clearAllNotifications", {}, (res) => {
-                    if (res.status == "success") {
-                        notyf.success("All notifications cleared");
-                        this.loadNotifications();
-                        this.updateBadge();
-                    }
-                });
-            }
-        });
-    },
-    
-    updateBadge: function() {
-        ajaxGet("getUnreadCount", {}, (res) => {
-            if (res.status == "success") {
-                let count = res.count || 0;
-                if (count > 0) {
-                    $("#notificationBadge").text(count).removeClass("hidden");
-                } else {
-                    $("#notificationBadge").addClass("hidden");
-                }
-            }
-        });
-    },
-    
-    addNotification: function(message, type) {
-        // Silently add to badge count
-        let currentCount = parseInt($("#notificationBadge").text() || "0");
-        $("#notificationBadge").text(currentCount + 1).removeClass("hidden");
-        
-        // Reload if panel is open
-        if (this.isOpen) {
-            this.loadNotifications();
+
+        try {
+            Message message = new MimeMessage(session);
+            message.setFrom(new InternetAddress(FROM_EMAIL));
+            message.setRecipients(Message.RecipientType.TO, InternetAddress.parse(to));
+            message.setSubject(subject);
+            message.setText(body);
+
+            Transport.send(message);
+            logger.info("Email sent successfully to " + to);
+            return true;
+
+        } catch (MessagingException e) {
+            logger.error("Failed to send email to " + to, e);
+            return false;
         }
     }
-};
+    
+    /**
+     * Send HTML email
+     */
+    public static boolean sendHtmlEmail(String to, String subject, String htmlBody) {
+        Properties props = new Properties();
+        props.put("mail.smtp.auth", "true"); 
+        props.put("mail.smtp.starttls.enable", "true");
+        props.put("mail.smtp.host", SMTP_HOST);
+        props.put("mail.smtp.port", SMTP_PORT);
 
-// Initialize on document ready
-$(document).ready(function() {
-    notificationPanel.init();
-});// Replace initNotifications or add if not present
-function initNotifications() {
-    // Initialize notification panel
-    notificationPanel.init();
+        Session session = Session.getInstance(props, new Authenticator() {
+            protected PasswordAuthentication getPasswordAuthentication() {
+                return new PasswordAuthentication(FROM_EMAIL, PASSWORD);
+            }
+        });
+
+        try {
+            Message message = new MimeMessage(session);
+            message.setFrom(new InternetAddress(FROM_EMAIL));
+            message.setRecipients(Message.RecipientType.TO, InternetAddress.parse(to));
+            message.setSubject(subject);
+            message.setContent(htmlBody, "text/html; charset=utf-8");
+
+            Transport.send(message);
+            logger.info("HTML email sent successfully to " + to);
+            return true;
+
+        } catch (MessagingException e) {
+            logger.error("Failed to send HTML email to " + to, e);
+            return false;
+        }
+    }
     
-    // SSE for real-time notifications (keep existing SSE code but modify)
-    let eventSource = new EventSource("NotificationServlet");
+    /**
+     * Send welcome email with credentials to new user
+     */
+    public static boolean sendWelcomeEmail(String to, String fullName, String username, 
+                                          String password, String role) {
+        String subject = "Welcome to SkillBridge - Your Account Credentials";
+        
+        String htmlBody = buildWelcomeEmailTemplate(fullName, username, password, role);
+        
+        return sendHtmlEmail(to, subject, htmlBody);
+    }
     
-    eventSource.addEventListener("candidate", (e) => {
-        notificationPanel.addNotification(e.data, "candidate");
-    });
+    /**
+     * Build HTML template for welcome email
+     */
+    private static String buildWelcomeEmailTemplate(String fullName, String username, 
+                                                    String password, String role) {
+        return "<!DOCTYPE html>" +
+            "<html>" +
+            "<head>" +
+            "<style>" +
+            "body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }" +
+            ".container { max-width: 600px; margin: 0 auto; padding: 20px; }" +
+            ".header { background-color: #2563eb; color: white; padding: 20px; text-align: center; }" +
+            ".content { background-color: #f9fafb; padding: 30px; }" +
+            ".credentials { background-color: white; border: 2px solid #e5e7eb; border-radius: 8px; padding: 20px; margin: 20px 0; }" +
+            ".credential-row { padding: 10px 0; border-bottom: 1px solid #e5e7eb; }" +
+            ".credential-label { font-weight: bold; color: #6b7280; }" +
+            ".credential-value { color: #1f2937; font-size: 16px; }" +
+            ".button { background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; margin-top: 20px; }" +
+            ".footer { text-align: center; padding: 20px; color: #6b7280; font-size: 14px; }" +
+            ".warning { background-color: #fef3c7; border-left: 4px solid #f59e0b; padding: 15px; margin: 20px 0; }" +
+            "</style>" +
+            "</head>" +
+            "<body>" +
+            "<div class='container'>" +
+            "<div class='header'>" +
+            "<h1>Welcome to SkillBridge</h1>" +
+            "</div>" +
+            "<div class='content'>" +
+            "<p>Dear " + fullName + ",</p>" +
+            "<p>Your account has been successfully created. Below are your login credentials:</p>" +
+            "<div class='credentials'>" +
+            "<div class='credential-row'>" +
+            "<span class='credential-label'>Username:</span> " +
+            "<span class='credential-value'>" + username + "</span>" +
+            "</div>" +
+            "<div class='credential-row'>" +
+            "<span class='credential-label'>Password:</span> " +
+            "<span class='credential-value'>" + password + "</span>" +
+            "</div>" +
+            "<div class='credential-row' style='border-bottom: none;'>" +
+            "<span class='credential-label'>Role:</span> " +
+            "<span class='credential-value'>" + role + "</span>" +
+            "</div>" +
+            "</div>" +
+            "<div class='warning'>" +
+            "<strong>⚠️ Security Notice:</strong> Please change your password after first login for security purposes." +
+            "</div>" +
+            "<a href='http://localhost:8080/YourApp/index.html' class='button'>Login Now</a>" +
+            "<p style='margin-top: 30px;'>If you have any questions, please contact your administrator.</p>" +
+            "</div>" +
+            "<div class='footer'>" +
+            "<p>© 2025 SkillBridge - Recruitment Management System</p>" +
+            "<p>This is an automated email. Please do not reply.</p>" +
+            "</div>" +
+            "</div>" +
+            "</body>" +
+            "</html>";
+    }
     
-    eventSource.addEventListener("evaluation", (e) => {
-        notificationPanel.addNotification(e.data, "evaluation");
-    });
+    /**
+     * Send assessment assignment notification
+     */
+    public static boolean sendAssessmentNotification(String to, String candidateName, 
+                                                     String assessmentName, String panelName) {
+        String subject = "New Assessment Assigned - " + assessmentName;
+        
+        String htmlBody = "<!DOCTYPE html>" +
+            "<html>" +
+            "<body style='font-family: Arial, sans-serif;'>" +
+            "<div style='max-width: 600px; margin: 0 auto; padding: 20px;'>" +
+            "<h2 style='color: #2563eb;'>New Assessment Assigned</h2>" +
+            "<p>Dear " + candidateName + ",</p>" +
+            "<p>A new assessment has been assigned to you:</p>" +
+            "<div style='background-color: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;'>" +
+            "<p><strong>Assessment:</strong> " + assessmentName + "</p>" +
+            "<p><strong>Assigned by:</strong> " + panelName + "</p>" +
+            "</div>" +
+            "<p>Please log in to your dashboard to view and attempt the assessment.</p>" +
+            "<a href='http://localhost:8080/YourApp/candidateDashboard.html' " +
+            "style='background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; margin-top: 20px;'>" +
+            "View Assessment</a>" +
+            "<p style='margin-top: 30px; color: #6b7280;'>Best regards,<br>SkillBridge Team</p>" +
+            "</div>" +
+            "</body>" +
+            "</html>";
+        
+        return sendHtmlEmail(to, subject, htmlBody);
+    }
     
-    eventSource.onerror = () => {
-        setTimeout(() => initNotifications(), 5000);
-    };
-}function initCandidateNotifications() {
-    notificationPanel.init();
-    
-    let eventSource = new EventSource("NotificationServlet");
-    
-    eventSource.addEventListener("assessment", (e) => {
-        notificationPanel.addNotification(e.data, "assessment");
-    });
-    
-    eventSource.onerror = () => {
-        setTimeout(() => initCandidateNotifications(), 5000);
-    };
-}function initNotifications() {
-    notificationPanel.init();
-    
-    const eventSource = new EventSource("NotificationServlet");
-    
-    eventSource.addEventListener("candidate", (e) => {
-        notificationPanel.addNotification(e.data, "candidate");
-    });
-    
-    eventSource.addEventListener("evaluation", (e) => {
-        notificationPanel.addNotification(e.data, "evaluation");
-    });
-    
-    eventSource.onerror = () => {
-        setTimeout(initNotifications, 5000);
-    };
+    /**
+     * Send evaluation completed notification
+     */
+    public static boolean sendEvaluationNotification(String to, String candidateName, 
+                                                     String assessmentName, int score, int totalMarks) {
+        String subject = "Assessment Evaluation Completed - " + assessmentName;
+        
+        String htmlBody = "<!DOCTYPE html>" +
+            "<html>" +
+            "<body style='font-family: Arial, sans-serif;'>" +
+            "<div style='max-width: 600px; margin: 0 auto; padding: 20px;'>" +
+            "<h2 style='color: #10b981;'>Assessment Evaluated</h2>" +
+            "<p>Dear " + candidateName + ",</p>" +
+            "<p>Your assessment has been evaluated:</p>" +
+            "<div style='background-color: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;'>" +
+            "<p><strong>Assessment:</strong> " + assessmentName + "</p>" +
+            "<p><strong>Score:</strong> " + score + " / " + totalMarks + "</p>" +
+            "</div>" +
+            "<p>Log in to view your detailed results.</p>" +
+            "<a href='http://localhost:8080/YourApp/candidateDashboard.html' " +
+            "style='background-color: #10b981; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; margin-top: 20px;'>" +
+            "View Results</a>" +
+            "<p style='margin-top: 30px; color: #6b7280;'>Best regards,<br>SkillBridge Team</p>" +
+            "</div>" +
+            "</body>" +
+            "</html>";
+        
+        return sendHtmlEmail(to, subject, htmlBody);
+    }
 }
