@@ -1,301 +1,414 @@
-package com.recruitement.service;
+package com.recruitement.mail;
 
-import java.util.List;
-
-import javax.servlet.http.HttpSession;
+import java.util.Properties;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import com.google.gson.JsonArray;
-import com.google.gson.JsonObject;
-import com.recruitement.dao.UserDAO;
-import com.recruitement.dao.UserDAOImpl;
-import com.recruitement.model.UserModel;
-import com.recruitement.util.EmailUtil;
+import jakarta.mail.Authenticator;
+import jakarta.mail.Message;
+import jakarta.mail.MessagingException;
+import jakarta.mail.PasswordAuthentication;
+import jakarta.mail.Session;
+import jakarta.mail.Transport;
+import jakarta.mail.internet.InternetAddress;
+import jakarta.mail.internet.MimeMessage;
 
-public class UserServiceImpl implements UserService {
-    private final UserDAO udao;
-    private static final Logger logger = LogManager.getLogger(UserServiceImpl.class);
+public class MailUtility {
 
-    public UserServiceImpl(UserDAO udao) {
-        this.udao = udao;
-    }
+    private static final Logger logger = LogManager.getLogger(MailUtility.class);
+    
+    private static final String FROM_EMAIL = "ranjithgm@datazoic.com"; 
+    private static final String PASSWORD = "bhnpcyqkyrpvkbgh";  
+    private static final String SMTP_HOST = "smtp.office365.com";
+    private static final String SMTP_PORT = "587";
+    
+    /**
+     * Send plain text email
+     */
+    public static boolean sendEmail(String to, String subject, String body) {
+        Properties props = new Properties();
+        props.put("mail.smtp.auth", "true"); 
+        props.put("mail.smtp.starttls.enable", "true");
+        props.put("mail.smtp.host", SMTP_HOST);
+        props.put("mail.smtp.port", SMTP_PORT);
 
-    @Override
-    public JsonObject addUser(String username, String fullName, String email, String password,
-                              String phone, String expertise, String role, boolean status) {
-
-        JsonObject response = new JsonObject();
+        Session session = Session.getInstance(props, new Authenticator() {
+            protected PasswordAuthentication getPasswordAuthentication() {
+                return new PasswordAuthentication(FROM_EMAIL, PASSWORD);
+            }
+        });
 
         try {
-            // Store the plain text password before hashing for email
-            String plainPassword = password;
+            Message message = new MimeMessage(session);
+            message.setFrom(new InternetAddress(FROM_EMAIL));
+            message.setRecipients(Message.RecipientType.TO, InternetAddress.parse(to));
+            message.setSubject(subject);
+            message.setText(body);
+
+            Transport.send(message);
+            logger.info("Email sent successfully to " + to);
+            return true;
+
+        } catch (MessagingException e) {
+            logger.error("Failed to send email to " + to, e);
+            return false;
+        }
+    }
+    
+    /**
+     * Send welcome email with credentials to new user
+     */
+    public static boolean sendWelcomeEmail(String to, String fullName, String username, 
+                                          String password, String role) {
+        String subject = "Welcome to SkillBridge - Your Account Credentials";
+        
+        String body = "Dear " + fullName + ",\n\n" +
+                     "Welcome to SkillBridge Recruitment Management System!\n\n" +
+                     "Your account has been successfully created. Here are your login credentials:\n\n" +
+                     "Username: " + username + "\n" +
+                     "Password: " + password + "\n" +
+                     "Role: " + role + "\n\n" +
+                     "SECURITY NOTICE: Please change your password after your first login.\n\n" +
+                     "Login URL: http://localhost:8080/YourApp/index.html\n\n" +
+                     "If you have any questions, please contact your administrator.\n\n" +
+                     "Best regards,\n" +
+                     "SkillBridge Team\n\n" +
+                     "---\n" +
+                     "© 2025 SkillBridge - Recruitment Management System\n" +
+                     "This is an automated email. Please do not reply.";
+        
+        return sendEmail(to, subject, body);
+    }
+}
+
+
+
+
+
+
+<!-- Profile Slide Panel -->
+<div id="profilePanel" class="hidden fixed inset-0 bg-black/50 z-50">
+  <div class="fixed right-0 top-0 h-full w-96 bg-white shadow-2xl transform translate-x-full transition-transform duration-300" id="profileSlide">
+    <div class="p-6 border-b flex justify-between items-center">
+      <h2 class="text-xl font-bold">My Profile</h2>
+      <button id="closeProfile" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+    </div>
+    
+    <div class="p-6 space-y-6 overflow-y-auto h-[calc(100%-80px)]">
+      <!-- Profile Info -->
+      <div class="space-y-4">
+        <div>
+          <label class="block text-sm text-gray-600 mb-1">Username</label>
+          <input type="text" id="profileUsername" class="w-full border rounded p-2 bg-gray-100" readonly>
+        </div>
+        <div>
+          <label class="block text-sm text-gray-600 mb-1">Email</label>
+          <input type="email" id="profileEmail" class="w-full border rounded p-2 bg-gray-100" readonly>
+        </div>
+        <div>
+          <label class="block text-sm text-gray-600 mb-1">Full Name</label>
+          <input type="text" id="profileFullName" class="w-full border rounded p-2">
+        </div>
+        <div>
+          <label class="block text-sm text-gray-600 mb-1">Phone</label>
+          <input type="tel" id="profilePhone" class="w-full border rounded p-2" pattern="[0-9]{10}">
+        </div>
+        <div id="profileExpertiseBlock" class="hidden">
+          <label class="block text-sm text-gray-600 mb-1">Expertise</label>
+          <input type="text" id="profileExpertise" class="w-full border rounded p-2">
+        </div>
+        
+        <!-- Change Password Section -->
+        <div class="border-t pt-4 mt-4">
+          <h3 class="text-md font-semibold mb-3 text-gray-700">Change Password</h3>
+          <div class="space-y-3">
+            <div>
+              <label class="block text-sm text-gray-600 mb-1">Current Password</label>
+              <input type="password" id="currentPassword" class="w-full border rounded p-2">
+              <p id="currentPassword_error" class="text-red-500 text-xs mt-1"></p>
+            </div>
+            <div>
+              <label class="block text-sm text-gray-600 mb-1">New Password</label>
+              <input type="password" id="newPassword" class="w-full border rounded p-2">
+              <p id="newPassword_error" class="text-red-500 text-xs mt-1"></p>
+            </div>
+            <div>
+              <label class="block text-sm text-gray-600 mb-1">Confirm New Password</label>
+              <input type="password" id="confirmPassword" class="w-full border rounded p-2">
+              <p id="confirmPassword_error" class="text-red-500 text-xs mt-1"></p>
+            </div>
+            <button id="changePasswordBtn" class="w-full bg-orange-600 text-white px-4 py-2 rounded hover:bg-orange-700">
+              Change Password
+            </button>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Save Button -->
+      <div class="border-t pt-4">
+        <button id="saveProfile" class="w-full bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+          Save Changes
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+
+
+// Add to UserDAO.java
+int changePassword(int userId, String currentPassword, String newPassword);
+
+// Add to UserDAOImpl.java
+@Override
+public int changePassword(int userId, String currentPassword, String newPassword) {
+    int rows = 0;
+    Connection conn = null;
+    PreparedStatement checkStmt = null;
+    PreparedStatement updateStmt = null;
+    ResultSet rs = null;
+    
+    try {
+        conn = DBConnector.getConnection();
+        
+        // First verify current password
+        String checkSql = "SELECT password FROM chandan_recruitement.M_D_USER WHERE user_id=?";
+        checkStmt = conn.prepareStatement(checkSql);
+        checkStmt.setInt(1, userId);
+        rs = checkStmt.executeQuery();
+        
+        if (rs.next()) {
+            String storedHash = rs.getString("password");
             
-            // Create user with hashed password
-            UserModel user = new UserModel(username, fullName, email, password, phone, role, expertise, status);
-            int inserted = udao.addUser(user);
-
-            if (inserted > 0) {
-                response.addProperty("status", "success");
-                response.addProperty("message", role + " added successfully");
-                response.addProperty("rowsInserted", inserted);
+            // Verify current password
+            if (BCrypt.checkpw(currentPassword, storedHash)) {
+                // Hash new password
+                String newHash = BCrypt.hashpw(newPassword, BCrypt.gensalt());
                 
-                // Send welcome email with credentials in background
-                new Thread(() -> {
-                    try {
-                        boolean emailSent = EmailUtil.sendWelcomeEmail(
-                            email, 
-                            fullName, 
-                            username, 
-                            plainPassword,  // Send plain password in email
-                            role
-                        );
-                        
-                        if (emailSent) {
-                            logger.info("Welcome email sent successfully to " + email);
-                        } else {
-                            logger.warn("Failed to send welcome email to " + email);
-                        }
-                    } catch (Exception e) {
-                        logger.error("Error sending welcome email to " + email, e);
-                    }
-                }).start();
+                // Update password
+                String updateSql = "UPDATE chandan_recruitement.M_D_USER SET password=?, update_time=GETDATE() WHERE user_id=?";
+                updateStmt = conn.prepareStatement(updateSql);
+                updateStmt.setString(1, newHash);
+                updateStmt.setInt(2, userId);
+                rows = updateStmt.executeUpdate();
                 
+                logger.info("Password changed successfully for userId: " + userId);
             } else {
-                response.addProperty("status", "error");
-                response.addProperty("message", "Failed to add " + role);
+                logger.warn("Current password verification failed for userId: " + userId);
+                return -1; // Special code for wrong current password
             }
+        }
+        
+    } catch (Exception e) {
+        e.printStackTrace();
+    } finally {
+        try {
+            if(rs != null) rs.close();
+            if(checkStmt != null) checkStmt.close();
+            if(updateStmt != null) updateStmt.close();
+            if(conn != null) conn.close();
+        } catch(Exception e) {
+            e.printStackTrace();
+        }
+    }
+    return rows;
+}
 
-        } catch (Exception e) {
-            logger.error("Error in addUser", e);
+
+
+
+
+<!-- Export Column Selection Modal -->
+<div id="exportModal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+  <div class="bg-white rounded-lg shadow-lg w-96 p-6">
+    <div class="flex justify-between items-center mb-4">
+      <h3 class="text-xl font-semibold text-gray-800">Export Options</h3>
+      <button id="closeExportModal" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+    </div>
+    
+    <div class="mb-4">
+      <label class="block text-sm font-medium text-gray-700 mb-2">Export Format</label>
+      <select id="exportFormat" class="w-full border rounded p-2">
+        <option value="excel">Excel (XLSX)</option>
+        <option value="pdf">PDF</option>
+        <option value="print">Print</option>
+      </select>
+    </div>
+    
+    <div class="mb-4">
+      <label class="block text-sm font-medium text-gray-700 mb-2">Column Selection</label>
+      <div class="flex items-center gap-4 mb-2">
+        <label class="flex items-center">
+          <input type="radio" name="columnOption" value="all" checked class="mr-2">
+          <span class="text-sm">All Columns</span>
+        </label>
+        <label class="flex items-center">
+          <input type="radio" name="columnOption" value="specific" class="mr-2">
+          <span class="text-sm">Select Columns</span>
+        </label>
+      </div>
+      
+      <!-- Column Checkboxes (shown when "Select Columns" is chosen) -->
+      <div id="columnCheckboxes" class="hidden mt-3 max-h-60 overflow-y-auto border rounded p-3">
+        <!-- Will be dynamically populated -->
+      </div>
+    </div>
+    
+    <div class="flex justify-end gap-2 mt-6">
+      <button id="cancelExport" class="bg-gray-300 px-4 py-2 rounded hover:bg-gray-400">Cancel</button>
+      <button id="confirmExport" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Export</button>
+    </div>
+  </div>
+</div>
+
+
+
+
+
+// Updated importQuestions method in AssessmentServiceImpl.java
+public JsonObject importQuestions(int assessmentId, String newQuestionsJson, int totalMarks, int totalQuestions) {
+    JsonObject response = new JsonObject();
+    Connection conn = null;
+    PreparedStatement ps = null;
+    ResultSet rs = null;
+
+    try {
+        // Validate input
+        if (newQuestionsJson == null || newQuestionsJson.trim().isEmpty()) {
             response.addProperty("status", "error");
-            response.addProperty("message", "Internal Server Error: " + e.getMessage());
+            response.addProperty("message", "No questions data provided");
+            return response;
+        }
+        
+        conn = DBConnector.getConnection();
+
+        // Fetch existing questions
+        String fetchQuery = "SELECT questions FROM chandan_recruitement.M_S_ASSESSMENT WHERE assessment_id = ?";
+        ps = conn.prepareStatement(fetchQuery);
+        ps.setInt(1, assessmentId);
+        rs = ps.executeQuery();
+
+        JsonArray existingQuestions = new JsonArray();
+        if (rs.next()) {
+            String existingJson = rs.getString("questions");
+            if (existingJson != null && !existingJson.trim().isEmpty() && 
+                !existingJson.equals("[]") && !existingJson.equals("null")) {
+                try {
+                    existingQuestions = JsonParser.parseString(existingJson).getAsJsonArray();
+                } catch (Exception e) {
+                    logger.error("Error parsing existing questions: " + e.getMessage());
+                    existingQuestions = new JsonArray();
+                }
+            }
         }
 
-        return response;
-    }
-
-    @Override
-    public JsonObject userLogin(String username, String password) {
-        JsonObject response = new JsonObject();
-
+        // Parse new questions
+        JsonArray newQuestions;
         try {
-            UserModel user = udao.getUserLogin(username, password);
-
-            if(user != null && username.equals(user.getUsername())) {
-                response.addProperty("status", "success");
-                response.addProperty("message", "Login successful");
-                response.addProperty("userId", user.getUserId());
-                response.addProperty("username", user.getUsername());
-                response.addProperty("full_name", user.getFullName());
-                response.addProperty("email", user.getEmail());
-                response.addProperty("expertise", user.getExpertise());
-                response.addProperty("phoneNo", user.getPhoneNo());
-                response.addProperty("role", user.getRole());
-                logger.info("Login response service: " + response.toString());
-            } else {
-                response.addProperty("status", "error");
-                response.addProperty("message", "Invalid username or password");
-            }
-
+            newQuestions = JsonParser.parseString(newQuestionsJson).getAsJsonArray();
         } catch (Exception e) {
-            logger.error("Error in userLogin", e);
             response.addProperty("status", "error");
-            response.addProperty("message", "Internal Server Error: " + e.getMessage());
+            response.addProperty("message", "Invalid JSON format for new questions");
+            logger.error("Failed to parse new questions JSON: " + e.getMessage());
+            return response;
         }
 
-        return response;
-    }
-
-    @Override
-    public JsonObject getAllUserByRole(String role) {
-        JsonArray userArray = new JsonArray();
-        JsonObject res = new JsonObject();
-
-        try {
-            List<UserModel> users = udao.getAllUsersByRole(role);
-
-            for (UserModel user : users) {
-                JsonObject obj = new JsonObject();
-                obj.addProperty("user_id", user.getUserId());
-                obj.addProperty("username", user.getUsername());
-                obj.addProperty("full_name", user.getFullName());
-                obj.addProperty("email", user.getEmail());
-                obj.addProperty("phone_no", user.getPhoneNo());
-                obj.addProperty("role", user.getRole());
-                obj.addProperty("expertise", user.getExpertise());
-                obj.addProperty("panel_name", user.getPanelName());
-                obj.addProperty("status", user.isStatus());
-                userArray.add(obj);
-                logger.info("User array: " + userArray);
+        // Validate each question has required fields
+        int nextQuestionId = existingQuestions.size() + 1;
+        int calculatedMarks = 0;
+        
+        for (JsonElement element : newQuestions) {
+            if (!element.isJsonObject()) {
+                continue;
             }
-            res.addProperty("status", "success");
-            res.add("users", userArray);
-
-        } catch (Exception e) {
-            logger.error("Error fetching users", e);
-            res.addProperty("status", "error");
-            res.addProperty("message", e.getMessage());
-        }
-
-        return res;
-    }
-
-    @Override
-    public JsonObject assignPanel(int candidateId, int panelId) {
-        JsonObject res = new JsonObject();
-        try {
-            int result = udao.assignPanel(candidateId, panelId);
-            if(result > 0) {
-                res.addProperty("status", "success");
-                res.addProperty("message", "Panel assigned successfully");
-            } else {
-                res.addProperty("status", "error");
-                res.addProperty("message", "Failed to assign Panel");
+            
+            JsonObject q = element.getAsJsonObject();
+            
+            // Ensure question has an ID
+            if (!q.has("question_id") || q.get("question_id").isJsonNull()) {
+                q.addProperty("question_id", nextQuestionId++);
             }
-        } catch (Exception e) {
-            logger.error("Error assigning panel", e);
-            res.addProperty("status", "error");
-            res.addProperty("message", "Something went wrong");
-        }
-        return res;
-    }
-
-    @Override
-    public JsonObject updateUserById(int userId, String fullName, String phoneNo, String expertise) {
-        JsonObject res = new JsonObject();
-        try {
-            int result = udao.updateUserById(userId, fullName, phoneNo, expertise);
-            if(result > 0) {
-                res.addProperty("status", "success");
-                res.addProperty("message", "User updated successfully");
-            } else {
-                res.addProperty("status", "error");
-                res.addProperty("message", "Failed to update user");
+            
+            // Validate required fields - set defaults if null
+            if (!q.has("question_text") || q.get("question_text").isJsonNull()) {
+                q.addProperty("question_text", "");
             }
-        } catch (Exception e) {
-            logger.error("Error updating user", e);
-            res.addProperty("status", "error");
-            res.addProperty("message", "Exception: " + e.getMessage());
-        }
-        return res;
-    }
-
-    @Override
-    public JsonObject getUserById(int userId) {
-        JsonObject res = new JsonObject();
-        try {
-            UserModel user = udao.getUserById(userId);
-
-            if (user != null) {
-                res.addProperty("status", "success");
-                JsonObject u = new JsonObject();
-                u.addProperty("user_id", user.getUserId());
-                u.addProperty("username", user.getUsername());
-                u.addProperty("full_name", user.getFullName());
-                u.addProperty("email", user.getEmail());
-                u.addProperty("phone_no", user.getPhoneNo());
-                u.addProperty("role", user.getRole());
-                u.addProperty("expertise", user.getExpertise());
-                u.addProperty("status", user.isStatus());
-                u.addProperty("panel_id", user.getPanel_id());
-                u.addProperty("panel_name", user.getPanelName());
-                
-                res.add("user", u);
-            } else {
-                res.addProperty("status", "error");
-                res.addProperty("message", "User not found");
+            if (!q.has("option_a") || q.get("option_a").isJsonNull()) {
+                q.addProperty("option_a", "");
             }
-        } catch (Exception e) {
-            logger.error("Error fetching user by id", e);
-            res.addProperty("status", "error");
-            res.addProperty("message", "Exception: " + e.getMessage());
-        }
-        return res;
-    }
-
-    @Override
-    public JsonObject deleteUserById(int userId) {
-        JsonObject res = new JsonObject();
-        try {
-            int result = udao.deleteUserById(userId);
-
-            if (result > 0) {
-                res.addProperty("status", "success");
-                res.addProperty("message", "User deactivated successfully.");
-            } else {
-                res.addProperty("status", "error");
-                res.addProperty("message", "User not found or already inactive.");
+            if (!q.has("option_b") || q.get("option_b").isJsonNull()) {
+                q.addProperty("option_b", "");
             }
-        } catch (Exception e) {
-            logger.error("Error deleting user", e);
-            res.addProperty("status", "error");
-            res.addProperty("message", "Exception: " + e.getMessage());
-        }
-        return res;
-    }
-
-    @Override
-    public JsonObject getCandidatesByPanel(int panelId) {
-        JsonObject res = new JsonObject();
-        JsonArray arr = new JsonArray();
-        try {
-            List<UserModel> list = udao.getCandidateByPanel(panelId);
-            for (UserModel u : list) {
-                JsonObject obj = new JsonObject();
-                obj.addProperty("user_id", u.getUserId());
-                obj.addProperty("username", u.getUsername());
-                obj.addProperty("full_name", u.getFullName());
-                obj.addProperty("email", u.getEmail());
-                obj.addProperty("phone_no", u.getPhoneNo());
-                obj.addProperty("status", u.isStatus());
-                obj.addProperty("panel_id", u.getPanel_id());
-                obj.addProperty("panel_name", u.getPanelName());
-                arr.add(obj);
+            if (!q.has("option_c") || q.get("option_c").isJsonNull()) {
+                q.addProperty("option_c", "");
             }
-            res.addProperty("status", "success");
-            res.add("candidates", arr);
-        } catch (Exception e) {
-            logger.error("Error fetching candidates by panel", e);
-            res.addProperty("status", "error");
-            res.addProperty("message", "Error fetching candidates by panel");
-        }
-        return res;
-    }
-
-    @Override
-    public boolean isUsernameExists(String username) {
-        return new UserDAOImpl().checkUsernameExists(username);
-    }
-
-    @Override
-    public boolean isEmailExists(String email) {
-        return new UserDAOImpl().checkEmailExists(email);
-    }
-
-    @Override
-    public JsonObject restoreUserById(int userId) {
-        JsonObject res = new JsonObject();
-        try {
-            int result = udao.restoreUserById(userId);
-            if (result > 0) {
-                res.addProperty("status", "success");
-                res.addProperty("message", "User restored successfully.");
-            } else {
-                res.addProperty("status", "error");
-                res.addProperty("message", "User not found.");
+            if (!q.has("option_d") || q.get("option_d").isJsonNull()) {
+                q.addProperty("option_d", "");
             }
-        } catch (Exception e) {
-            logger.error("Error restoring user", e);
-            res.addProperty("status", "error");
-            res.addProperty("message", "Exception: " + e.getMessage());
+            if (!q.has("correct_answer") || q.get("correct_answer").isJsonNull()) {
+                q.addProperty("correct_answer", "A");
+            }
+            if (!q.has("marks") || q.get("marks").isJsonNull()) {
+                q.addProperty("marks", 1);
+            }
+            
+            // Calculate total marks
+            calculatedMarks += q.get("marks").getAsInt();
+            
+            // Add to existing questions
+            existingQuestions.add(q);
         }
-        return res;
+
+        // Calculate final totals
+        int finalTotalQuestions = existingQuestions.size();
+        int finalTotalMarks = 0;
+        
+        // Recalculate total marks from all questions
+        for (JsonElement element : existingQuestions) {
+            if (element.isJsonObject()) {
+                JsonObject q = element.getAsJsonObject();
+                if (q.has("marks") && !q.get("marks").isJsonNull()) {
+                    finalTotalMarks += q.get("marks").getAsInt();
+                }
+            }
+        }
+
+        // Update database
+        String updateQuery = "UPDATE chandan_recruitement.M_S_ASSESSMENT SET questions = ?, total_marks = ?, total_questions = ? WHERE assessment_id = ?";
+        
+        ps = conn.prepareStatement(updateQuery);
+        ps.setString(1, existingQuestions.toString());
+        ps.setInt(2, finalTotalMarks);
+        ps.setInt(3, finalTotalQuestions);
+        ps.setInt(4, assessmentId);
+        
+        int rowsUpdated = ps.executeUpdate();
+        
+        if (rowsUpdated > 0) {
+            response.addProperty("status", "success");
+            response.addProperty("message", "Questions imported successfully!");
+            response.addProperty("total_questions", finalTotalQuestions);
+            response.addProperty("total_marks", finalTotalMarks);
+            response.addProperty("new_questions_added", newQuestions.size());
+            
+            logger.info("Successfully imported " + newQuestions.size() + " questions. Total: " + finalTotalQuestions);
+        } else {
+            response.addProperty("status", "error");
+            response.addProperty("message", "Failed to update assessment");
+        }
+
+    } catch (Exception e) {
+        e.printStackTrace();
+        logger.error("Error importing questions: " + e.getMessage(), e);
+        response.addProperty("status", "error");
+        response.addProperty("message", "Error importing questions: " + e.getMessage());
+    } finally {
+        try { if (rs != null) rs.close(); } catch (Exception ignored) {}
+        try { if (ps != null) ps.close(); } catch (Exception ignored) {}
+        try { if (conn != null) conn.close(); } catch (Exception ignored) {}
     }
 
-    @Override
-    public List<String> getAllExpertise() {
-        return udao.getAllExpertise();
-    }
+    return response;
 }
