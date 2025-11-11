@@ -1,1 +1,301 @@
+package com.recruitement.service;
 
+import java.util.List;
+
+import javax.servlet.http.HttpSession;
+
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
+import com.recruitement.dao.UserDAO;
+import com.recruitement.dao.UserDAOImpl;
+import com.recruitement.model.UserModel;
+import com.recruitement.util.EmailUtil;
+
+public class UserServiceImpl implements UserService {
+    private final UserDAO udao;
+    private static final Logger logger = LogManager.getLogger(UserServiceImpl.class);
+
+    public UserServiceImpl(UserDAO udao) {
+        this.udao = udao;
+    }
+
+    @Override
+    public JsonObject addUser(String username, String fullName, String email, String password,
+                              String phone, String expertise, String role, boolean status) {
+
+        JsonObject response = new JsonObject();
+
+        try {
+            // Store the plain text password before hashing for email
+            String plainPassword = password;
+            
+            // Create user with hashed password
+            UserModel user = new UserModel(username, fullName, email, password, phone, role, expertise, status);
+            int inserted = udao.addUser(user);
+
+            if (inserted > 0) {
+                response.addProperty("status", "success");
+                response.addProperty("message", role + " added successfully");
+                response.addProperty("rowsInserted", inserted);
+                
+                // Send welcome email with credentials in background
+                new Thread(() -> {
+                    try {
+                        boolean emailSent = EmailUtil.sendWelcomeEmail(
+                            email, 
+                            fullName, 
+                            username, 
+                            plainPassword,  // Send plain password in email
+                            role
+                        );
+                        
+                        if (emailSent) {
+                            logger.info("Welcome email sent successfully to " + email);
+                        } else {
+                            logger.warn("Failed to send welcome email to " + email);
+                        }
+                    } catch (Exception e) {
+                        logger.error("Error sending welcome email to " + email, e);
+                    }
+                }).start();
+                
+            } else {
+                response.addProperty("status", "error");
+                response.addProperty("message", "Failed to add " + role);
+            }
+
+        } catch (Exception e) {
+            logger.error("Error in addUser", e);
+            response.addProperty("status", "error");
+            response.addProperty("message", "Internal Server Error: " + e.getMessage());
+        }
+
+        return response;
+    }
+
+    @Override
+    public JsonObject userLogin(String username, String password) {
+        JsonObject response = new JsonObject();
+
+        try {
+            UserModel user = udao.getUserLogin(username, password);
+
+            if(user != null && username.equals(user.getUsername())) {
+                response.addProperty("status", "success");
+                response.addProperty("message", "Login successful");
+                response.addProperty("userId", user.getUserId());
+                response.addProperty("username", user.getUsername());
+                response.addProperty("full_name", user.getFullName());
+                response.addProperty("email", user.getEmail());
+                response.addProperty("expertise", user.getExpertise());
+                response.addProperty("phoneNo", user.getPhoneNo());
+                response.addProperty("role", user.getRole());
+                logger.info("Login response service: " + response.toString());
+            } else {
+                response.addProperty("status", "error");
+                response.addProperty("message", "Invalid username or password");
+            }
+
+        } catch (Exception e) {
+            logger.error("Error in userLogin", e);
+            response.addProperty("status", "error");
+            response.addProperty("message", "Internal Server Error: " + e.getMessage());
+        }
+
+        return response;
+    }
+
+    @Override
+    public JsonObject getAllUserByRole(String role) {
+        JsonArray userArray = new JsonArray();
+        JsonObject res = new JsonObject();
+
+        try {
+            List<UserModel> users = udao.getAllUsersByRole(role);
+
+            for (UserModel user : users) {
+                JsonObject obj = new JsonObject();
+                obj.addProperty("user_id", user.getUserId());
+                obj.addProperty("username", user.getUsername());
+                obj.addProperty("full_name", user.getFullName());
+                obj.addProperty("email", user.getEmail());
+                obj.addProperty("phone_no", user.getPhoneNo());
+                obj.addProperty("role", user.getRole());
+                obj.addProperty("expertise", user.getExpertise());
+                obj.addProperty("panel_name", user.getPanelName());
+                obj.addProperty("status", user.isStatus());
+                userArray.add(obj);
+                logger.info("User array: " + userArray);
+            }
+            res.addProperty("status", "success");
+            res.add("users", userArray);
+
+        } catch (Exception e) {
+            logger.error("Error fetching users", e);
+            res.addProperty("status", "error");
+            res.addProperty("message", e.getMessage());
+        }
+
+        return res;
+    }
+
+    @Override
+    public JsonObject assignPanel(int candidateId, int panelId) {
+        JsonObject res = new JsonObject();
+        try {
+            int result = udao.assignPanel(candidateId, panelId);
+            if(result > 0) {
+                res.addProperty("status", "success");
+                res.addProperty("message", "Panel assigned successfully");
+            } else {
+                res.addProperty("status", "error");
+                res.addProperty("message", "Failed to assign Panel");
+            }
+        } catch (Exception e) {
+            logger.error("Error assigning panel", e);
+            res.addProperty("status", "error");
+            res.addProperty("message", "Something went wrong");
+        }
+        return res;
+    }
+
+    @Override
+    public JsonObject updateUserById(int userId, String fullName, String phoneNo, String expertise) {
+        JsonObject res = new JsonObject();
+        try {
+            int result = udao.updateUserById(userId, fullName, phoneNo, expertise);
+            if(result > 0) {
+                res.addProperty("status", "success");
+                res.addProperty("message", "User updated successfully");
+            } else {
+                res.addProperty("status", "error");
+                res.addProperty("message", "Failed to update user");
+            }
+        } catch (Exception e) {
+            logger.error("Error updating user", e);
+            res.addProperty("status", "error");
+            res.addProperty("message", "Exception: " + e.getMessage());
+        }
+        return res;
+    }
+
+    @Override
+    public JsonObject getUserById(int userId) {
+        JsonObject res = new JsonObject();
+        try {
+            UserModel user = udao.getUserById(userId);
+
+            if (user != null) {
+                res.addProperty("status", "success");
+                JsonObject u = new JsonObject();
+                u.addProperty("user_id", user.getUserId());
+                u.addProperty("username", user.getUsername());
+                u.addProperty("full_name", user.getFullName());
+                u.addProperty("email", user.getEmail());
+                u.addProperty("phone_no", user.getPhoneNo());
+                u.addProperty("role", user.getRole());
+                u.addProperty("expertise", user.getExpertise());
+                u.addProperty("status", user.isStatus());
+                u.addProperty("panel_id", user.getPanel_id());
+                u.addProperty("panel_name", user.getPanelName());
+                
+                res.add("user", u);
+            } else {
+                res.addProperty("status", "error");
+                res.addProperty("message", "User not found");
+            }
+        } catch (Exception e) {
+            logger.error("Error fetching user by id", e);
+            res.addProperty("status", "error");
+            res.addProperty("message", "Exception: " + e.getMessage());
+        }
+        return res;
+    }
+
+    @Override
+    public JsonObject deleteUserById(int userId) {
+        JsonObject res = new JsonObject();
+        try {
+            int result = udao.deleteUserById(userId);
+
+            if (result > 0) {
+                res.addProperty("status", "success");
+                res.addProperty("message", "User deactivated successfully.");
+            } else {
+                res.addProperty("status", "error");
+                res.addProperty("message", "User not found or already inactive.");
+            }
+        } catch (Exception e) {
+            logger.error("Error deleting user", e);
+            res.addProperty("status", "error");
+            res.addProperty("message", "Exception: " + e.getMessage());
+        }
+        return res;
+    }
+
+    @Override
+    public JsonObject getCandidatesByPanel(int panelId) {
+        JsonObject res = new JsonObject();
+        JsonArray arr = new JsonArray();
+        try {
+            List<UserModel> list = udao.getCandidateByPanel(panelId);
+            for (UserModel u : list) {
+                JsonObject obj = new JsonObject();
+                obj.addProperty("user_id", u.getUserId());
+                obj.addProperty("username", u.getUsername());
+                obj.addProperty("full_name", u.getFullName());
+                obj.addProperty("email", u.getEmail());
+                obj.addProperty("phone_no", u.getPhoneNo());
+                obj.addProperty("status", u.isStatus());
+                obj.addProperty("panel_id", u.getPanel_id());
+                obj.addProperty("panel_name", u.getPanelName());
+                arr.add(obj);
+            }
+            res.addProperty("status", "success");
+            res.add("candidates", arr);
+        } catch (Exception e) {
+            logger.error("Error fetching candidates by panel", e);
+            res.addProperty("status", "error");
+            res.addProperty("message", "Error fetching candidates by panel");
+        }
+        return res;
+    }
+
+    @Override
+    public boolean isUsernameExists(String username) {
+        return new UserDAOImpl().checkUsernameExists(username);
+    }
+
+    @Override
+    public boolean isEmailExists(String email) {
+        return new UserDAOImpl().checkEmailExists(email);
+    }
+
+    @Override
+    public JsonObject restoreUserById(int userId) {
+        JsonObject res = new JsonObject();
+        try {
+            int result = udao.restoreUserById(userId);
+            if (result > 0) {
+                res.addProperty("status", "success");
+                res.addProperty("message", "User restored successfully.");
+            } else {
+                res.addProperty("status", "error");
+                res.addProperty("message", "User not found.");
+            }
+        } catch (Exception e) {
+            logger.error("Error restoring user", e);
+            res.addProperty("status", "error");
+            res.addProperty("message", "Exception: " + e.getMessage());
+        }
+        return res;
+    }
+
+    @Override
+    public List<String> getAllExpertise() {
+        return udao.getAllExpertise();
+    }
+}
