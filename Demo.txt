@@ -79,3 +79,376 @@
     </div>
   </div>
 </div>
+
+
+
+// Profile Management
+let originalProfileData = {};
+
+function openProfilePanel() {
+  ajaxGet("getUserDetails", {}, function(res) {
+    if (res.status == "success") {
+      // Store original data
+      originalProfileData = {
+        fullName: res.fullName || "",
+        phoneNo: res.phoneNo || "",
+        expertise: res.expertise || ""
+      };
+      
+      // Populate fields
+      $("#profileUsername").val(res.username || "");
+      $("#profileEmail").val(res.email || "");
+      $("#profileFullName").val(res.fullName || "");
+      $("#profilePhone").val(res.phoneNo || "");
+      
+      // Show expertise field only for PANEL role
+      if (res.role == "PANEL") {
+        $("#profileExpertiseBlock").show();
+        $("#profileExpertise").val(res.expertise || "");
+      } else {
+        $("#profileExpertiseBlock").hide();
+      }
+      
+      // Clear all error messages and password fields
+      clearAllProfileErrors();
+      clearPasswordFields();
+      $("#passwordSection").addClass("hidden");
+      
+      // Show panel
+      $("#profilePanel").removeClass("hidden");
+      setTimeout(() => $("#profileSlide").removeClass("translate-x-full"), 10);
+    } else {
+      notyf.error("Failed to load profile");
+    }
+  });
+}
+
+function closeProfilePanel() {
+  $("#profileSlide").addClass("translate-x-full");
+  setTimeout(() => {
+    $("#profilePanel").addClass("hidden");
+    clearAllProfileErrors();
+    clearPasswordFields();
+  }, 300);
+}
+
+function clearAllProfileErrors() {
+  $("#profileFullName_error, #profilePhone_error, #currentPassword_error, #newPassword_error, #confirmPassword_error").text("");
+  $("#profileFullName, #profilePhone, #currentPassword, #newPassword, #confirmPassword").removeClass("border-red-500");
+}
+
+function clearPasswordFields() {
+  $("#currentPassword, #newPassword, #confirmPassword").val("");
+}
+
+// Validate profile fields
+function validateProfileField(fieldId) {
+  let value = $("#" + fieldId).val().trim();
+  
+  switch(fieldId) {
+    case "profileFullName":
+      if (!value || value.length < 3) {
+        showProfileError(fieldId, "Full name must be at least 3 characters");
+        return false;
+      }
+      break;
+    case "profilePhone":
+      if (!value || !isValidPhone(value)) {
+        showProfileError(fieldId, "Enter a valid 10-digit phone number");
+        return false;
+      }
+      break;
+  }
+  
+  clearProfileError(fieldId);
+  return true;
+}
+
+function showProfileError(fieldId, message) {
+  $("#" + fieldId).addClass("border-red-500");
+  $("#" + fieldId + "_error").text(message);
+}
+
+function clearProfileError(fieldId) {
+  $("#" + fieldId).removeClass("border-red-500");
+  $("#" + fieldId + "_error").text("");
+}
+
+// Real-time validation
+$(document).on("input", "#profileFullName", function() {
+  validateProfileField("profileFullName");
+});
+
+$(document).on("input", "#profilePhone", function() {
+  validateProfileField("profilePhone");
+});
+
+// Toggle password section
+$(document).on("click", "#togglePasswordSection", function() {
+  $("#passwordSection").toggleClass("hidden");
+  if (!$("#passwordSection").hasClass("hidden")) {
+    clearPasswordFields();
+    clearAllProfileErrors();
+  }
+});
+
+// Save Profile Changes
+$(document).on("click", "#saveProfile", function() {
+  // Validate fields
+  let isValid = true;
+  
+  if (!validateProfileField("profileFullName")) isValid = false;
+  if (!validateProfileField("profilePhone")) isValid = false;
+  
+  if (!isValid) {
+    notyf.error("Please fix the errors before saving");
+    return;
+  }
+  
+  // Get values
+  let fullName = $("#profileFullName").val().trim();
+  let phoneNo = $("#profilePhone").val().trim();
+  let expertise = $("#profileExpertise").val().trim();
+  
+  // Check for changes
+  if (fullName == originalProfileData.fullName && 
+      phoneNo == originalProfileData.phoneNo && 
+      expertise == originalProfileData.expertise) {
+    notyf.error("No changes detected");
+    return;
+  }
+  
+  // Prepare data
+  let data = {
+    user_id: sessionStorage.getItem("user_id"),
+    full_name: fullName,
+    phone_no: phoneNo,
+    expertise: expertise
+  };
+  
+  // Show loading
+  Swal.fire({
+    title: 'Updating Profile...',
+    html: 'Please wait',
+    allowOutsideClick: false,
+    didOpen: () => {
+      Swal.showLoading();
+    }
+  });
+  
+  ajaxPost("updateUser", data, function(res) {
+    Swal.close();
+    
+    if (res.status == "success") {
+      notyf.success("Profile updated successfully");
+      
+      // Update original data
+      originalProfileData = {
+        fullName: fullName,
+        phoneNo: phoneNo,
+        expertise: expertise
+      };
+      
+      // Refresh user details in header
+      getUserDetails();
+      
+      // Close panel after delay
+      setTimeout(() => closeProfilePanel(), 1000);
+    } else {
+      notyf.error(res.message || "Failed to update profile");
+    }
+  }, function() {
+    Swal.close();
+    notyf.error("Failed to update profile. Please try again.");
+  });
+});
+
+// Change Password
+$(document).on("click", "#changePasswordBtn", function() {
+  // Clear previous errors
+  $("#currentPassword_error, #newPassword_error, #confirmPassword_error").text("");
+  $("#currentPassword, #newPassword, #confirmPassword").removeClass("border-red-500");
+  
+  // Get values
+  let currentPassword = $("#currentPassword").val().trim();
+  let newPassword = $("#newPassword").val().trim();
+  let confirmPassword = $("#confirmPassword").val().trim();
+  
+  // Validation
+  let isValid = true;
+  
+  if (!currentPassword) {
+    showProfileError("currentPassword", "Current password is required");
+    isValid = false;
+  }
+  
+  if (!newPassword || newPassword.length < 8) {
+    showProfileError("newPassword", "New password must be at least 8 characters");
+    isValid = false;
+  }
+  
+  if (!confirmPassword) {
+    showProfileError("confirmPassword", "Please confirm your new password");
+    isValid = false;
+  }
+  
+  if (newPassword && confirmPassword && newPassword !== confirmPassword) {
+    showProfileError("confirmPassword", "Passwords do not match");
+    isValid = false;
+  }
+  
+  if (currentPassword && newPassword && currentPassword === newPassword) {
+    showProfileError("newPassword", "New password must be different from current password");
+    isValid = false;
+  }
+  
+  if (!isValid) {
+    notyf.error("Please fix the errors before proceeding");
+    return;
+  }
+  
+  // Confirm change
+  Swal.fire({
+    title: "Change Password?",
+    text: "Are you sure you want to change your password?",
+    icon: "question",
+    showCancelButton: true,
+    confirmButtonColor: "#2563eb",
+    confirmButtonText: "Yes, change it"
+  }).then((result) => {
+    if (result.isConfirmed) {
+      // Show loading
+      Swal.fire({
+        title: 'Changing Password...',
+        html: 'Please wait',
+        allowOutsideClick: false,
+        didOpen: () => {
+          Swal.showLoading();
+        }
+      });
+      
+      ajaxPost("changePassword", {
+        user_id: sessionStorage.getItem("user_id"),
+        current_password: currentPassword,
+        new_password: newPassword
+      }, function(res) {
+        Swal.close();
+        
+        if (res.status == "success") {
+          Swal.fire({
+            title: "Success!",
+            text: "Password changed successfully. Please login again with your new password.",
+            icon: "success",
+            confirmButtonColor: "#2563eb"
+          }).then(() => {
+            // Logout user
+            ajaxPost("logout", {}, function() {
+              window.location.href = "index.html";
+            });
+          });
+        } else if (res.message && res.message.includes("incorrect")) {
+          showProfileError("currentPassword", "Current password is incorrect");
+          notyf.error("Current password is incorrect");
+        } else {
+          notyf.error(res.message || "Failed to change password");
+        }
+      }, function() {
+        Swal.close();
+        notyf.error("Failed to change password. Please try again.");
+      });
+    }
+  });
+});
+
+
+
+@Override
+public int changePassword(int userId, String currentPassword, String newPassword) {
+    int rows = 0;
+    Connection conn = null;
+    PreparedStatement checkStmt = null;
+    PreparedStatement updateStmt = null;
+    ResultSet rs = null;
+    
+    try {
+        conn = DBConnector.getConnection();
+        
+        // First verify current password
+        String checkSql = "SELECT password FROM chandan_recruitement.M_D_USER WHERE user_id=?";
+        checkStmt = conn.prepareStatement(checkSql);
+        checkStmt.setInt(1, userId);
+        rs = checkStmt.executeQuery();
+        
+        if (rs.next()) {
+            String storedHash = rs.getString("password");
+            
+            // Verify current password
+            if (BCrypt.checkpw(currentPassword, storedHash)) {
+                // Hash new password
+                String newHash = BCrypt.hashpw(newPassword, BCrypt.gensalt());
+                
+                // Update password
+                String updateSql = "UPDATE chandan_recruitement.M_D_USER SET password=?, update_time=GETDATE() WHERE user_id=?";
+                updateStmt = conn.prepareStatement(updateSql);
+                updateStmt.setString(1, newHash);
+                updateStmt.setInt(2, userId);
+                rows = updateStmt.executeUpdate();
+                
+                logger.info("Password changed successfully for userId: " + userId);
+            } else {
+                logger.warn("Incorrect current password for userId: " + userId);
+                return -1; // Incorrect current password
+            }
+        }
+        
+    } catch (Exception e) {
+        logger.error("Error changing password", e);
+        e.printStackTrace();
+    } finally {
+        try {
+            if(rs != null) rs.close();
+            if(checkStmt != null) checkStmt.close();
+            if(updateStmt != null) updateStmt.close();
+            if(conn != null) conn.close();
+        } catch(Exception e) {
+            e.printStackTrace();
+        }
+    }
+    return rows;
+}
+
+
+
+@Override
+public int updateUserById(int userId, String fullName, String phoneNo, String expertise) {
+    int x = 0;
+    Connection conn = null;
+    PreparedStatement pstmt = null;
+    try {
+        conn = DBConnector.getConnection();
+        String sql = "UPDATE chandan_recruitement.M_D_USER SET full_name=?, phone_no=?, expertise=?, update_time=GETDATE() WHERE user_id=?";
+        
+        pstmt = conn.prepareStatement(sql);
+        pstmt.setString(1, fullName != null ? fullName.trim() : "");
+        pstmt.setString(2, phoneNo != null ? phoneNo.trim() : "");
+        pstmt.setString(3, expertise != null ? expertise.trim() : "");
+        pstmt.setInt(4, userId);
+        
+        x = pstmt.executeUpdate();
+        
+        if (x > 0) {
+            logger.info("User profile updated successfully for userId: " + userId);
+        }
+    } catch (Exception e) {
+        logger.error("Error updating user profile", e);
+        e.printStackTrace();
+    } finally {
+        try {
+            if(pstmt != null) pstmt.close();
+            if(conn != null) conn.close();
+        } catch(Exception e) {
+            e.printStackTrace();
+        }
+    }
+    return x;
+}
