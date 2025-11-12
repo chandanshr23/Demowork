@@ -1,454 +1,422 @@
-<!-- Profile Slide Panel -->
-<div id="profilePanel" class="hidden fixed inset-0 bg-black/50 z-50">
-  <div class="fixed right-0 top-0 h-full w-96 bg-white shadow-2xl transform translate-x-full transition-transform duration-300 flex flex-col" id="profileSlide">
-    <!-- Fixed Header -->
-    <div class="p-6 border-b flex justify-between items-center flex-shrink-0 bg-white">
-      <h2 class="text-xl font-bold">My Profile</h2>
-      <button id="closeProfile" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+<!-- Export Column Selection Modal -->
+<div id="exportModal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+  <div class="bg-white rounded-lg shadow-lg w-[500px] max-h-[90vh] flex flex-col">
+    <div class="flex justify-between items-center p-6 border-b">
+      <h3 class="text-xl font-semibold text-gray-800">Export Options</h3>
+      <button id="closeExportModal" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
     </div>
     
-    <!-- Scrollable Content -->
-    <div class="flex-1 overflow-y-auto">
-      <div class="p-6 space-y-6">
-        <!-- Profile Info -->
-        <div class="space-y-4">
-          <div>
-            <label class="block text-sm text-gray-600 mb-1">Username</label>
-            <input type="text" id="profileUsername" class="w-full border rounded p-2 bg-gray-100" readonly>
-          </div>
-          <div>
-            <label class="block text-sm text-gray-600 mb-1">Email</label>
-            <input type="email" id="profileEmail" class="w-full border rounded p-2 bg-gray-100" readonly>
-          </div>
-          <div>
-            <label class="block text-sm text-gray-600 mb-1">Full Name <span class="text-red-500">*</span></label>
-            <input type="text" id="profileFullName" class="w-full border rounded p-2">
-            <p id="profileFullName_error" class="text-red-500 text-xs mt-1"></p>
-          </div>
-          <div>
-            <label class="block text-sm text-gray-600 mb-1">Phone <span class="text-red-500">*</span></label>
-            <input type="tel" id="profilePhone" class="w-full border rounded p-2" pattern="[0-9]{10}">
-            <p id="profilePhone_error" class="text-red-500 text-xs mt-1"></p>
-          </div>
-          <div id="profileExpertiseBlock" class="hidden">
-            <label class="block text-sm text-gray-600 mb-1">Expertise</label>
-            <input type="text" id="profileExpertise" class="w-full border rounded p-2">
-          </div>
+    <div class="p-6 overflow-y-auto flex-1">
+      <!-- Export Format -->
+      <div class="mb-6">
+        <label class="block text-sm font-medium text-gray-700 mb-2">Export Format</label>
+        <select id="exportFormat" class="w-full border rounded p-2 focus:ring-2 focus:ring-blue-500">
+          <option value="excel">Excel (XLSX)</option>
+          <option value="pdf">PDF</option>
+          <option value="print">Print</option>
+        </select>
+      </div>
+      
+      <!-- Column Selection -->
+      <div class="mb-6">
+        <label class="block text-sm font-medium text-gray-700 mb-2">Select Columns to Export</label>
+        <div class="flex items-center gap-4 mb-3">
+          <button id="selectAllColumns" class="text-sm text-blue-600 hover:text-blue-800">Select All</button>
+          <button id="deselectAllColumns" class="text-sm text-gray-600 hover:text-gray-800">Deselect All</button>
         </div>
-
-        <!-- Save Profile Button -->
-        <div class="border-t pt-4">
-          <button id="saveProfile" class="w-full bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
-            Save Profile Changes
-          </button>
-        </div>
-
-        <!-- Change Password Section -->
-        <div class="border-t pt-4 mt-4">
-          <button id="togglePasswordSection" class="w-full bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700 mb-3">
-            Change Password
-          </button>
-          
-          <div id="passwordSection" class="hidden space-y-3">
-            <h3 class="text-md font-semibold mb-3 text-gray-700">Change Password</h3>
-            
-            <div>
-              <label class="block text-sm text-gray-600 mb-1">Current Password <span class="text-red-500">*</span></label>
-              <input type="password" id="currentPassword" class="w-full border rounded p-2" placeholder="Enter current password">
-              <p id="currentPassword_error" class="text-red-500 text-xs mt-1"></p>
-            </div>
-            
-            <div>
-              <label class="block text-sm text-gray-600 mb-1">New Password <span class="text-red-500">*</span></label>
-              <input type="password" id="newPassword" class="w-full border rounded p-2" placeholder="Min 8 characters">
-              <p id="newPassword_error" class="text-red-500 text-xs mt-1"></p>
-            </div>
-            
-            <div>
-              <label class="block text-sm text-gray-600 mb-1">Confirm New Password <span class="text-red-500">*</span></label>
-              <input type="password" id="confirmPassword" class="w-full border rounded p-2" placeholder="Re-enter new password">
-              <p id="confirmPassword_error" class="text-red-500 text-xs mt-1"></p>
-            </div>
-            
-            <button id="changePasswordBtn" class="w-full bg-orange-600 text-white px-4 py-2 rounded hover:bg-orange-700">
-              Change Password
-            </button>
-          </div>
+        
+        <div id="columnCheckboxes" class="max-h-60 overflow-y-auto border rounded p-3 space-y-2">
+          <!-- Will be dynamically populated -->
         </div>
       </div>
+      
+      <!-- Row Selection -->
+      <div class="mb-6">
+        <label class="block text-sm font-medium text-gray-700 mb-2">Export Rows</label>
+        <div class="space-y-2">
+          <label class="flex items-center gap-2 p-2 hover:bg-gray-50 rounded cursor-pointer">
+            <input type="radio" name="rowOption" value="all" checked class="w-4 h-4">
+            <span class="text-sm">All Rows</span>
+          </label>
+          <label class="flex items-center gap-2 p-2 hover:bg-gray-50 rounded cursor-pointer">
+            <input type="radio" name="rowOption" value="current" class="w-4 h-4">
+            <span class="text-sm">Current Page Only</span>
+          </label>
+          <label class="flex items-center gap-2 p-2 hover:bg-gray-50 rounded cursor-pointer">
+            <input type="radio" name="rowOption" value="active" class="w-4 h-4">
+            <span class="text-sm">Active Users Only</span>
+          </label>
+        </div>
+      </div>
+      
+      <!-- File Name -->
+      <div class="mb-6">
+        <label class="block text-sm font-medium text-gray-700 mb-2">File Name (optional)</label>
+        <input type="text" id="exportFileName" 
+               class="w-full border rounded p-2 focus:ring-2 focus:ring-blue-500" 
+               placeholder="e.g., User_Report">
+        <p class="text-xs text-gray-500 mt-1">Leave empty for default name</p>
+      </div>
+    </div>
+    
+    <div class="flex justify-end gap-2 p-6 border-t bg-gray-50">
+      <button id="cancelExport" class="bg-gray-300 px-6 py-2 rounded hover:bg-gray-400">Cancel</button>
+      <button id="confirmExport" class="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700">Export</button>
     </div>
   </div>
 </div>
 
 
+function loadUserPage(role) {
+    let title = role.charAt(0) + role.slice(1).toLowerCase() + " Management";
+    let tableId = role.toLowerCase() + "Table";
 
-// Profile Management
-let originalProfileData = {};
+    let html = `
+    <div class="flex justify-between mb-4">
+      <h2 class="text-2xl font-bold">${title}</h2>
+      <div class="flex gap-2">
+        <button id="btnExportUsers" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 flex items-center gap-2">
+          <span class="material-icons text-sm">download</span> Export
+        </button>
+        <button id="btnAddUser" class="bg-blue-600 text-white px-4 py-2 rounded">+ Add</button>
+      </div>
+    </div>
 
-function openProfilePanel() {
-  ajaxGet("getUserDetails", {}, function(res) {
-    if (res.status == "success") {
-      // Store original data
-      originalProfileData = {
-        fullName: res.fullName || "",
-        phoneNo: res.phoneNo || "",
-        expertise: res.expertise || ""
-      };
-      
-      // Populate fields
-      $("#profileUsername").val(res.username || "");
-      $("#profileEmail").val(res.email || "");
-      $("#profileFullName").val(res.fullName || "");
-      $("#profilePhone").val(res.phoneNo || "");
-      
-      // Show expertise field only for PANEL role
-      if (res.role == "PANEL") {
-        $("#profileExpertiseBlock").show();
-        $("#profileExpertise").val(res.expertise || "");
-      } else {
-        $("#profileExpertiseBlock").hide();
-      }
-      
-      // Clear all error messages and password fields
-      clearAllProfileErrors();
-      clearPasswordFields();
-      $("#passwordSection").addClass("hidden");
-      
-      // Show panel
-      $("#profilePanel").removeClass("hidden");
-      setTimeout(() => $("#profileSlide").removeClass("translate-x-full"), 10);
-    } else {
-      notyf.error("Failed to load profile");
-    }
-  });
+    <div class="overflow-x-auto bg-white rounded shadow">
+      <table id="${tableId}" class="display min-w-full">
+        <thead><tr>
+        <th>Status</th>
+          <th>Username</th>
+          <th>FullName</th>
+          <th>Email</th>
+          <th>Phone Number</th>
+          ${role == "PANEL" ? "<th>Expertise</th>" : ""}
+          ${role == "CANDIDATE" ? "<th>Panel</th>" : ""}
+          <th>Actions</th>
+        </tr></thead>
+        <tbody id="${tableId}Body"></tbody>
+      </table>
+    </div>
+
+    ${buildUserModal(role)}
+    ${buildEditModal(role)}
+    ${role == "CANDIDATE" ? buildAssignPanelModal() : ""}
+  `;
+    $("#userSection").html(html);
+    loadUsers(role);
+    bindUserActions(role);
 }
 
-function closeProfilePanel() {
-  $("#profileSlide").addClass("translate-x-full");
-  setTimeout(() => {
-    $("#profilePanel").addClass("hidden");
-    clearAllProfileErrors();
-    clearPasswordFields();
-  }, 300);
-}
 
-function clearAllProfileErrors() {
-  $("#profileFullName_error, #profilePhone_error, #currentPassword_error, #newPassword_error, #confirmPassword_error").text("");
-  $("#profileFullName, #profilePhone, #currentPassword, #newPassword, #confirmPassword").removeClass("border-red-500");
-}
 
-function clearPasswordFields() {
-  $("#currentPassword, #newPassword, #confirmPassword").val("");
-}
+// Store current table reference for export
+let currentExportTable = null;
+let currentExportRole = null;
 
-// Validate profile fields
-function validateProfileField(fieldId) {
-  let value = $("#" + fieldId).val().trim();
-  
-  switch(fieldId) {
-    case "profileFullName":
-      if (!value || value.length < 3) {
-        showProfileError(fieldId, "Full name must be at least 3 characters");
-        return false;
-      }
-      break;
-    case "profilePhone":
-      if (!value || !isValidPhone(value)) {
-        showProfileError(fieldId, "Enter a valid 10-digit phone number");
-        return false;
-      }
-      break;
-  }
-  
-  clearProfileError(fieldId);
-  return true;
-}
-
-function showProfileError(fieldId, message) {
-  $("#" + fieldId).addClass("border-red-500");
-  $("#" + fieldId + "_error").text(message);
-}
-
-function clearProfileError(fieldId) {
-  $("#" + fieldId).removeClass("border-red-500");
-  $("#" + fieldId + "_error").text("");
-}
-
-// Real-time validation
-$(document).on("input", "#profileFullName", function() {
-  validateProfileField("profileFullName");
-});
-
-$(document).on("input", "#profilePhone", function() {
-  validateProfileField("profilePhone");
-});
-
-// Toggle password section
-$(document).on("click", "#togglePasswordSection", function() {
-  $("#passwordSection").toggleClass("hidden");
-  if (!$("#passwordSection").hasClass("hidden")) {
-    clearPasswordFields();
-    clearAllProfileErrors();
-  }
-});
-
-// Save Profile Changes
-$(document).on("click", "#saveProfile", function() {
-  // Validate fields
-  let isValid = true;
-  
-  if (!validateProfileField("profileFullName")) isValid = false;
-  if (!validateProfileField("profilePhone")) isValid = false;
-  
-  if (!isValid) {
-    notyf.error("Please fix the errors before saving");
-    return;
-  }
-  
-  // Get values
-  let fullName = $("#profileFullName").val().trim();
-  let phoneNo = $("#profilePhone").val().trim();
-  let expertise = $("#profileExpertise").val().trim();
-  
-  // Check for changes
-  if (fullName == originalProfileData.fullName && 
-      phoneNo == originalProfileData.phoneNo && 
-      expertise == originalProfileData.expertise) {
-    notyf.error("No changes detected");
-    return;
-  }
-  
-  // Prepare data
-  let data = {
-    user_id: sessionStorage.getItem("user_id"),
-    full_name: fullName,
-    phone_no: phoneNo,
-    expertise: expertise
-  };
-  
-  // Show loading
-  Swal.fire({
-    title: 'Updating Profile...',
-    html: 'Please wait',
-    allowOutsideClick: false,
-    didOpen: () => {
-      Swal.showLoading();
-    }
-  });
-  
-  ajaxPost("updateUser", data, function(res) {
-    Swal.close();
+// Export button handler
+$(document).on("click", "#btnExportUsers", function() {
+    let tableId = currentExportRole.toLowerCase() + "Table";
+    let table = $("#" + tableId).DataTable();
+    currentExportTable = table;
     
-    if (res.status == "success") {
-      notyf.success("Profile updated successfully");
-      
-      // Update original data
-      originalProfileData = {
-        fullName: fullName,
-        phoneNo: phoneNo,
-        expertise: expertise
-      };
-      
-      // Refresh user details in header
-      getUserDetails();
-      
-      // Close panel after delay
-      setTimeout(() => closeProfilePanel(), 1000);
-    } else {
-      notyf.error(res.message || "Failed to update profile");
-    }
-  }, function() {
-    Swal.close();
-    notyf.error("Failed to update profile. Please try again.");
-  });
+    // Get table columns
+    let columns = [];
+    table.columns().every(function(index) {
+        let header = $(this.header()).text().trim();
+        let visible = this.visible();
+        
+        // Exclude Actions column
+        if (header !== "Actions" && visible) {
+            columns.push({
+                index: index,
+                title: header,
+                visible: visible
+            });
+        }
+    });
+    
+    showExportModal(columns, table);
 });
 
-// Change Password
-$(document).on("click", "#changePasswordBtn", function() {
-  // Clear previous errors
-  $("#currentPassword_error, #newPassword_error, #confirmPassword_error").text("");
-  $("#currentPassword, #newPassword, #confirmPassword").removeClass("border-red-500");
-  
-  // Get values
-  let currentPassword = $("#currentPassword").val().trim();
-  let newPassword = $("#newPassword").val().trim();
-  let confirmPassword = $("#confirmPassword").val().trim();
-  
-  // Validation
-  let isValid = true;
-  
-  if (!currentPassword) {
-    showProfileError("currentPassword", "Current password is required");
-    isValid = false;
-  }
-  
-  if (!newPassword || newPassword.length < 8) {
-    showProfileError("newPassword", "New password must be at least 8 characters");
-    isValid = false;
-  }
-  
-  if (!confirmPassword) {
-    showProfileError("confirmPassword", "Please confirm your new password");
-    isValid = false;
-  }
-  
-  if (newPassword && confirmPassword && newPassword !== confirmPassword) {
-    showProfileError("confirmPassword", "Passwords do not match");
-    isValid = false;
-  }
-  
-  if (currentPassword && newPassword && currentPassword === newPassword) {
-    showProfileError("newPassword", "New password must be different from current password");
-    isValid = false;
-  }
-  
-  if (!isValid) {
-    notyf.error("Please fix the errors before proceeding");
-    return;
-  }
-  
-  // Confirm change
-  Swal.fire({
-    title: "Change Password?",
-    text: "Are you sure you want to change your password?",
-    icon: "question",
-    showCancelButton: true,
-    confirmButtonColor: "#2563eb",
-    confirmButtonText: "Yes, change it"
-  }).then((result) => {
-    if (result.isConfirmed) {
-      // Show loading
-      Swal.fire({
-        title: 'Changing Password...',
-        html: 'Please wait',
+function showExportModal(columns, tableInstance) {
+    $("#exportModal").removeClass("hidden");
+    currentExportTable = tableInstance;
+    
+    // Reset to default state
+    $("#exportFormat").val("excel");
+    $("input[name='rowOption'][value='all']").prop("checked", true);
+    $("#exportFileName").val("");
+    
+    // Populate column checkboxes
+    let checkboxHtml = "";
+    columns.forEach(col => {
+        checkboxHtml += `
+            <label class="flex items-center gap-2 p-2 hover:bg-gray-50 rounded cursor-pointer">
+                <input type="checkbox" class="export-col-checkbox w-4 h-4" value="${col.index}" checked data-title="${col.title}">
+                <span class="text-sm">${col.title}</span>
+            </label>`;
+    });
+    $("#columnCheckboxes").html(checkboxHtml);
+    
+    // Select/Deselect all handlers
+    $("#selectAllColumns").off("click").on("click", function() {
+        $(".export-col-checkbox").prop("checked", true);
+    });
+    
+    $("#deselectAllColumns").off("click").on("click", function() {
+        $(".export-col-checkbox").prop("checked", false);
+    });
+    
+    // Export confirmation
+    $("#confirmExport").off("click").on("click", function() {
+        performExport();
+    });
+}
+
+function performExport() {
+    let format = $("#exportFormat").val();
+    let rowOption = $("input[name='rowOption']:checked").val();
+    let fileName = $("#exportFileName").val().trim() || (currentExportRole + "_Report");
+    
+    // Get selected columns
+    let selectedCols = [];
+    let columnTitles = [];
+    $(".export-col-checkbox:checked").each(function() {
+        selectedCols.push(parseInt($(this).val()));
+        columnTitles.push($(this).data("title"));
+    });
+    
+    if (selectedCols.length === 0) {
+        notyf.error("Please select at least one column");
+        return;
+    }
+    
+    // Filter rows based on selection
+    let rowsToExport = getRowsToExport(rowOption);
+    
+    if (rowsToExport.length === 0) {
+        notyf.error("No rows to export");
+        return;
+    }
+    
+    // Close modal
+    $("#exportModal").addClass("hidden");
+    
+    // Show loading
+    Swal.fire({
+        title: 'Exporting...',
+        html: 'Please wait while we prepare your export',
         allowOutsideClick: false,
         didOpen: () => {
-          Swal.showLoading();
+            Swal.showLoading();
         }
-      });
-      
-      ajaxPost("changePassword", {
-        user_id: sessionStorage.getItem("user_id"),
-        current_password: currentPassword,
-        new_password: newPassword
-      }, function(res) {
-        Swal.close();
-        
-        if (res.status == "success") {
-          Swal.fire({
-            title: "Success!",
-            text: "Password changed successfully. Please login again with your new password.",
-            icon: "success",
-            confirmButtonColor: "#2563eb"
-          }).then(() => {
-            // Logout user
-            ajaxPost("logout", {}, function() {
-              window.location.href = "index.html";
-            });
-          });
-        } else if (res.message && res.message.includes("incorrect")) {
-          showProfileError("currentPassword", "Current password is incorrect");
-          notyf.error("Current password is incorrect");
-        } else {
-          notyf.error(res.message || "Failed to change password");
-        }
-      }, function() {
-        Swal.close();
-        notyf.error("Failed to change password. Please try again.");
-      });
-    }
-  });
-});
-
-
-
-@Override
-public int changePassword(int userId, String currentPassword, String newPassword) {
-    int rows = 0;
-    Connection conn = null;
-    PreparedStatement checkStmt = null;
-    PreparedStatement updateStmt = null;
-    ResultSet rs = null;
+    });
     
-    try {
-        conn = DBConnector.getConnection();
+    // Perform export based on format
+    setTimeout(() => {
+        if (format === "excel") {
+            exportToExcel(rowsToExport, selectedCols, columnTitles, fileName);
+        } else if (format === "pdf") {
+            exportToPDF(rowsToExport, selectedCols, columnTitles, fileName);
+        } else if (format === "print") {
+            printTable(rowsToExport, selectedCols, columnTitles);
+        }
         
-        // First verify current password
-        String checkSql = "SELECT password FROM chandan_recruitement.M_D_USER WHERE user_id=?";
-        checkStmt = conn.prepareStatement(checkSql);
-        checkStmt.setInt(1, userId);
-        rs = checkStmt.executeQuery();
-        
-        if (rs.next()) {
-            String storedHash = rs.getString("password");
-            
-            // Verify current password
-            if (BCrypt.checkpw(currentPassword, storedHash)) {
-                // Hash new password
-                String newHash = BCrypt.hashpw(newPassword, BCrypt.gensalt());
-                
-                // Update password
-                String updateSql = "UPDATE chandan_recruitement.M_D_USER SET password=?, update_time=GETDATE() WHERE user_id=?";
-                updateStmt = conn.prepareStatement(updateSql);
-                updateStmt.setString(1, newHash);
-                updateStmt.setInt(2, userId);
-                rows = updateStmt.executeUpdate();
-                
-                logger.info("Password changed successfully for userId: " + userId);
-            } else {
-                logger.warn("Incorrect current password for userId: " + userId);
-                return -1; // Incorrect current password
+        Swal.close();
+        notyf.success("Export completed successfully!");
+    }, 500);
+}
+
+function getRowsToExport(rowOption) {
+    let rows = [];
+    let table = currentExportTable;
+    
+    if (rowOption === "all") {
+        // Get all rows
+        table.rows().every(function() {
+            rows.push(this.data());
+        });
+    } else if (rowOption === "current") {
+        // Get current page rows only
+        table.rows({page: 'current'}).every(function() {
+            rows.push(this.data());
+        });
+    } else if (rowOption === "active") {
+        // Get only active users (status = active)
+        table.rows().every(function() {
+            let rowData = this.data();
+            // Check if Status column contains "Active"
+            if (rowData[0] && rowData[0].includes("Active")) {
+                rows.push(rowData);
             }
-        }
-        
-    } catch (Exception e) {
-        logger.error("Error changing password", e);
-        e.printStackTrace();
-    } finally {
-        try {
-            if(rs != null) rs.close();
-            if(checkStmt != null) checkStmt.close();
-            if(updateStmt != null) updateStmt.close();
-            if(conn != null) conn.close();
-        } catch(Exception e) {
-            e.printStackTrace();
-        }
+        });
     }
+    
     return rows;
 }
 
-
-
-@Override
-public int updateUserById(int userId, String fullName, String phoneNo, String expertise) {
-    int x = 0;
-    Connection conn = null;
-    PreparedStatement pstmt = null;
-    try {
-        conn = DBConnector.getConnection();
-        String sql = "UPDATE chandan_recruitement.M_D_USER SET full_name=?, phone_no=?, expertise=?, update_time=GETDATE() WHERE user_id=?";
-        
-        pstmt = conn.prepareStatement(sql);
-        pstmt.setString(1, fullName != null ? fullName.trim() : "");
-        pstmt.setString(2, phoneNo != null ? phoneNo.trim() : "");
-        pstmt.setString(3, expertise != null ? expertise.trim() : "");
-        pstmt.setInt(4, userId);
-        
-        x = pstmt.executeUpdate();
-        
-        if (x > 0) {
-            logger.info("User profile updated successfully for userId: " + userId);
-        }
-    } catch (Exception e) {
-        logger.error("Error updating user profile", e);
-        e.printStackTrace();
-    } finally {
-        try {
-            if(pstmt != null) pstmt.close();
-            if(conn != null) conn.close();
-        } catch(Exception e) {
-            e.printStackTrace();
-        }
-    }
-    return x;
+function exportToExcel(rows, selectedCols, columnTitles, fileName) {
+    // Create workbook
+    let wb = XLSX.utils.book_new();
+    
+    // Prepare data
+    let exportData = [];
+    
+    // Add headers
+    exportData.push(columnTitles);
+    
+    // Add rows with selected columns only
+    rows.forEach(rowData => {
+        let row = [];
+        selectedCols.forEach(colIndex => {
+            let cellData = rowData[colIndex] || "";
+            // Clean HTML tags
+            cellData = $("<div>").html(cellData).text().trim();
+            row.push(cellData);
+        });
+        exportData.push(row);
+    });
+    
+    // Create worksheet
+    let ws = XLSX.utils.aoa_to_sheet(exportData);
+    
+    // Set column widths
+    let colWidths = columnTitles.map(() => ({wch: 20}));
+    ws['!cols'] = colWidths;
+    
+    // Add worksheet to workbook
+    XLSX.utils.book_append_sheet(wb, ws, "Users");
+    
+    // Save file
+    XLSX.writeFile(wb, fileName + ".xlsx");
 }
+
+function exportToPDF(rows, selectedCols, columnTitles, fileName) {
+    // Create printable HTML
+    let html = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>${fileName}</title>
+            <style>
+                body { font-family: Arial, sans-serif; margin: 20px; }
+                h1 { color: #333; text-align: center; margin-bottom: 20px; }
+                table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                th { background-color: #4a5568; color: white; padding: 10px; text-align: left; border: 1px solid #ddd; }
+                td { padding: 8px; border: 1px solid #ddd; }
+                tr:nth-child(even) { background-color: #f9fafb; }
+                .footer { margin-top: 30px; text-align: center; color: #666; font-size: 12px; }
+            </style>
+        </head>
+        <body>
+            <h1>${currentExportRole} Report</h1>
+            <p style="text-align: center; color: #666;">Generated on ${new Date().toLocaleString()}</p>
+            <table>
+                <thead>
+                    <tr>
+                        ${columnTitles.map(title => `<th>${title}</th>`).join('')}
+                    </tr>
+                </thead>
+                <tbody>
+                    ${rows.map(rowData => {
+                        let rowHtml = '<tr>';
+                        selectedCols.forEach(colIndex => {
+                            let cellData = rowData[colIndex] || "";
+                            cellData = $("<div>").html(cellData).text().trim();
+                            rowHtml += `<td>${cellData}</td>`;
+                        });
+                        rowHtml += '</tr>';
+                        return rowHtml;
+                    }).join('')}
+                </tbody>
+            </table>
+            <div class="footer">
+                <p>© 2025 SkillBridge - Recruitment Management System</p>
+            </div>
+        </body>
+        </html>
+    `;
+    
+    // Open print window
+    let printWindow = window.open('', '_blank');
+    printWindow.document.write(html);
+    printWindow.document.close();
+    
+    // Wait for content to load then trigger print
+    printWindow.onload = function() {
+        printWindow.print();
+        // Close window after printing (optional)
+        setTimeout(() => {
+            printWindow.close();
+        }, 100);
+    };
+}
+
+function printTable(rows, selectedCols, columnTitles) {
+    // Same as PDF but directly print
+    exportToPDF(rows, selectedCols, columnTitles, currentExportRole + "_Report");
+}
+
+// Close export modal
+$("#closeExportModal, #cancelExport").click(function() {
+    $("#exportModal").addClass("hidden");
+});
+
+
+
+function loadUsers(role) {
+    currentExportRole = role; // Store current role for export
+    let tableId = role.toLowerCase() + "Table";
+
+    if ($.fn.DataTable.isDataTable("#" + tableId)) {
+        $("#" + tableId).DataTable().destroy();
+        $("#" + tableId + "Body").empty(); 
+    }
+
+    ajaxGet("getAllUsersByRole", {
+        role: role
+    }, function(res) {
+        if (res.status == "success" && res.users && res.users.length > 0) {
+            res.users.sort((a,b)=>{
+                let statusA=a.status?1:0;
+                let statusB=b.status?1:0;
+                return statusB-statusA;
+            });
+            
+            let rows = "";
+            res.users.forEach((u) => {
+                rows += buildTableRow(u, role);
+            });
+            $("#" + tableId + "Body").html(rows);
+
+            // Initialize DataTable without default export buttons
+            $("#" + tableId).DataTable({
+                paging: true,
+                searching: true,
+                info: true,
+                responsive: true,
+                ordering: false,
+                autoWidth: false,
+                columnDefs: [{
+                    targets: -1, 
+                    orderable: false,
+                    className: 'text-center'
+                }],
+                destroy: true
+            });
+        } else {
+            let colCount = role == "PANEL" ? 7 : role == "CANDIDATE" ? 7 : 6;
+            $("#" + tableId + "Body").html(
+                `<tr><td colspan="${colCount}" class="text-center">No users found</td></tr>`
+            );
+        }
+    });
+}
+
+
+
+<!-- SheetJS for Excel export -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+<!-- Material Icons -->
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
