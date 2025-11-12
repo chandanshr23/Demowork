@@ -1,71 +1,6 @@
-<!-- Export Column Selection Modal -->
-<div id="exportModal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-  <div class="bg-white rounded-lg shadow-lg w-[500px] max-h-[90vh] flex flex-col">
-    <div class="flex justify-between items-center p-6 border-b">
-      <h3 class="text-xl font-semibold text-gray-800">Export Options</h3>
-      <button id="closeExportModal" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
-    </div>
-    
-    <div class="p-6 overflow-y-auto flex-1">
-      <!-- Export Format -->
-      <div class="mb-6">
-        <label class="block text-sm font-medium text-gray-700 mb-2">Export Format</label>
-        <select id="exportFormat" class="w-full border rounded p-2 focus:ring-2 focus:ring-blue-500">
-          <option value="excel">Excel (XLSX)</option>
-          <option value="pdf">PDF</option>
-          <option value="print">Print</option>
-        </select>
-      </div>
-      
-      <!-- Column Selection -->
-      <div class="mb-6">
-        <label class="block text-sm font-medium text-gray-700 mb-2">Select Columns to Export</label>
-        <div class="flex items-center gap-4 mb-3">
-          <button id="selectAllColumns" class="text-sm text-blue-600 hover:text-blue-800">Select All</button>
-          <button id="deselectAllColumns" class="text-sm text-gray-600 hover:text-gray-800">Deselect All</button>
-        </div>
-        
-        <div id="columnCheckboxes" class="max-h-60 overflow-y-auto border rounded p-3 space-y-2">
-          <!-- Will be dynamically populated -->
-        </div>
-      </div>
-      
-      <!-- Row Selection -->
-      <div class="mb-6">
-        <label class="block text-sm font-medium text-gray-700 mb-2">Export Rows</label>
-        <div class="space-y-2">
-          <label class="flex items-center gap-2 p-2 hover:bg-gray-50 rounded cursor-pointer">
-            <input type="radio" name="rowOption" value="all" checked class="w-4 h-4">
-            <span class="text-sm">All Rows</span>
-          </label>
-          <label class="flex items-center gap-2 p-2 hover:bg-gray-50 rounded cursor-pointer">
-            <input type="radio" name="rowOption" value="current" class="w-4 h-4">
-            <span class="text-sm">Current Page Only</span>
-          </label>
-          <label class="flex items-center gap-2 p-2 hover:bg-gray-50 rounded cursor-pointer">
-            <input type="radio" name="rowOption" value="active" class="w-4 h-4">
-            <span class="text-sm">Active Users Only</span>
-          </label>
-        </div>
-      </div>
-      
-      <!-- File Name -->
-      <div class="mb-6">
-        <label class="block text-sm font-medium text-gray-700 mb-2">File Name (optional)</label>
-        <input type="text" id="exportFileName" 
-               class="w-full border rounded p-2 focus:ring-2 focus:ring-blue-500" 
-               placeholder="e.g., User_Report">
-        <p class="text-xs text-gray-500 mt-1">Leave empty for default name</p>
-      </div>
-    </div>
-    
-    <div class="flex justify-end gap-2 p-6 border-t bg-gray-50">
-      <button id="cancelExport" class="bg-gray-300 px-6 py-2 rounded hover:bg-gray-400">Cancel</button>
-      <button id="confirmExport" class="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700">Export</button>
-    </div>
-  </div>
-</div>
-
+// Store current table reference for export
+let currentExportTable = null;
+let currentExportRole = null;
 
 function loadUserPage(role) {
     let title = role.charAt(0) + role.slice(1).toLowerCase() + " Management";
@@ -107,38 +42,94 @@ function loadUserPage(role) {
     bindUserActions(role);
 }
 
+function loadUsers(role) {
+    currentExportRole = role; // Store current role for export
+    let tableId = role.toLowerCase() + "Table";
 
+    if ($.fn.DataTable.isDataTable("#" + tableId)) {
+        $("#" + tableId).DataTable().destroy();
+        $("#" + tableId + "Body").empty(); 
+    }
 
-// Store current table reference for export
-let currentExportTable = null;
-let currentExportRole = null;
-
-// Export button handler
-$(document).on("click", "#btnExportUsers", function() {
-    let tableId = currentExportRole.toLowerCase() + "Table";
-    let table = $("#" + tableId).DataTable();
-    currentExportTable = table;
-    
-    // Get table columns
-    let columns = [];
-    table.columns().every(function(index) {
-        let header = $(this.header()).text().trim();
-        let visible = this.visible();
-        
-        // Exclude Actions column
-        if (header !== "Actions" && visible) {
-            columns.push({
-                index: index,
-                title: header,
-                visible: visible
+    ajaxGet("getAllUsersByRole", {
+        role: role
+    }, function(res) {
+        if (res.status == "success" && res.users && res.users.length > 0) {
+            res.users.sort((a,b)=>{
+                let statusA=a.status?1:0;
+                let statusB=b.status?1:0;
+                return statusB-statusA;
             });
+            
+            let rows = "";
+            res.users.forEach((u) => {
+                rows += buildTableRow(u, role);
+            });
+            $("#" + tableId + "Body").html(rows);
+
+            // Initialize DataTable without default export buttons
+            $("#" + tableId).DataTable({
+                paging: true,
+                searching: true,
+                info: true,
+                responsive: true,
+                ordering: false,
+                autoWidth: false,
+                columnDefs: [{
+                    targets: -1, 
+                    orderable: false,
+                    className: 'text-center'
+                }],
+                destroy: true
+            });
+            
+            // Bind export button after table is ready
+            bindExportButton();
+        } else {
+            let colCount = role == "PANEL" ? 7 : role == "CANDIDATE" ? 7 : 6;
+            $("#" + tableId + "Body").html(
+                `<tr><td colspan="${colCount}" class="text-center">No users found</td></tr>`
+            );
         }
     });
+}
+
+// Bind export button handler
+function bindExportButton() {
+    // Remove previous handler to avoid duplicates
+    $("#btnExportUsers").off("click");
     
-    showExportModal(columns, table);
-});
+    // Bind new handler
+    $("#btnExportUsers").on("click", function() {
+        console.log("Export button clicked for role:", currentExportRole);
+        
+        let tableId = currentExportRole.toLowerCase() + "Table";
+        let table = $("#" + tableId).DataTable();
+        currentExportTable = table;
+        
+        // Get table columns
+        let columns = [];
+        table.columns().every(function(index) {
+            let header = $(this.header()).text().trim();
+            let visible = this.visible();
+            
+            // Exclude Actions column
+            if (header !== "Actions" && visible) {
+                columns.push({
+                    index: index,
+                    title: header,
+                    visible: visible
+                });
+            }
+        });
+        
+        showExportModal(columns, table);
+    });
+}
 
 function showExportModal(columns, tableInstance) {
+    console.log("Opening export modal with", columns.length, "columns");
+    
     $("#exportModal").removeClass("hidden");
     currentExportTable = tableInstance;
     
@@ -157,21 +148,28 @@ function showExportModal(columns, tableInstance) {
             </label>`;
     });
     $("#columnCheckboxes").html(checkboxHtml);
-    
-    // Select/Deselect all handlers
-    $("#selectAllColumns").off("click").on("click", function() {
+}
+
+// Select/Deselect all handlers - bind once on document ready
+$(document).ready(function() {
+    $("#selectAllColumns").on("click", function() {
         $(".export-col-checkbox").prop("checked", true);
     });
     
-    $("#deselectAllColumns").off("click").on("click", function() {
+    $("#deselectAllColumns").on("click", function() {
         $(".export-col-checkbox").prop("checked", false);
     });
     
+    // Close export modal
+    $("#closeExportModal, #cancelExport").on("click", function() {
+        $("#exportModal").addClass("hidden");
+    });
+    
     // Export confirmation
-    $("#confirmExport").off("click").on("click", function() {
+    $("#confirmExport").on("click", function() {
         performExport();
     });
-}
+});
 
 function performExport() {
     let format = $("#exportFormat").val();
@@ -231,6 +229,11 @@ function getRowsToExport(rowOption) {
     let rows = [];
     let table = currentExportTable;
     
+    if (!table) {
+        console.error("No table reference found");
+        return rows;
+    }
+    
     if (rowOption === "all") {
         // Get all rows
         table.rows().every(function() {
@@ -252,171 +255,122 @@ function getRowsToExport(rowOption) {
         });
     }
     
+    console.log("Exporting", rows.length, "rows with option:", rowOption);
     return rows;
 }
 
 function exportToExcel(rows, selectedCols, columnTitles, fileName) {
-    // Create workbook
-    let wb = XLSX.utils.book_new();
-    
-    // Prepare data
-    let exportData = [];
-    
-    // Add headers
-    exportData.push(columnTitles);
-    
-    // Add rows with selected columns only
-    rows.forEach(rowData => {
-        let row = [];
-        selectedCols.forEach(colIndex => {
-            let cellData = rowData[colIndex] || "";
-            // Clean HTML tags
-            cellData = $("<div>").html(cellData).text().trim();
-            row.push(cellData);
+    try {
+        // Create workbook
+        let wb = XLSX.utils.book_new();
+        
+        // Prepare data
+        let exportData = [];
+        
+        // Add headers
+        exportData.push(columnTitles);
+        
+        // Add rows with selected columns only
+        rows.forEach(rowData => {
+            let row = [];
+            selectedCols.forEach(colIndex => {
+                let cellData = rowData[colIndex] || "";
+                // Clean HTML tags
+                cellData = $("<div>").html(cellData).text().trim();
+                row.push(cellData);
+            });
+            exportData.push(row);
         });
-        exportData.push(row);
-    });
-    
-    // Create worksheet
-    let ws = XLSX.utils.aoa_to_sheet(exportData);
-    
-    // Set column widths
-    let colWidths = columnTitles.map(() => ({wch: 20}));
-    ws['!cols'] = colWidths;
-    
-    // Add worksheet to workbook
-    XLSX.utils.book_append_sheet(wb, ws, "Users");
-    
-    // Save file
-    XLSX.writeFile(wb, fileName + ".xlsx");
+        
+        // Create worksheet
+        let ws = XLSX.utils.aoa_to_sheet(exportData);
+        
+        // Set column widths
+        let colWidths = columnTitles.map(() => ({wch: 20}));
+        ws['!cols'] = colWidths;
+        
+        // Add worksheet to workbook
+        XLSX.utils.book_append_sheet(wb, ws, "Users");
+        
+        // Save file
+        XLSX.writeFile(wb, fileName + ".xlsx");
+        
+        console.log("Excel export completed:", fileName);
+    } catch (error) {
+        console.error("Excel export error:", error);
+        notyf.error("Excel export failed: " + error.message);
+    }
 }
 
 function exportToPDF(rows, selectedCols, columnTitles, fileName) {
-    // Create printable HTML
-    let html = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>${fileName}</title>
-            <style>
-                body { font-family: Arial, sans-serif; margin: 20px; }
-                h1 { color: #333; text-align: center; margin-bottom: 20px; }
-                table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-                th { background-color: #4a5568; color: white; padding: 10px; text-align: left; border: 1px solid #ddd; }
-                td { padding: 8px; border: 1px solid #ddd; }
-                tr:nth-child(even) { background-color: #f9fafb; }
-                .footer { margin-top: 30px; text-align: center; color: #666; font-size: 12px; }
-            </style>
-        </head>
-        <body>
-            <h1>${currentExportRole} Report</h1>
-            <p style="text-align: center; color: #666;">Generated on ${new Date().toLocaleString()}</p>
-            <table>
-                <thead>
-                    <tr>
-                        ${columnTitles.map(title => `<th>${title}</th>`).join('')}
-                    </tr>
-                </thead>
-                <tbody>
-                    ${rows.map(rowData => {
-                        let rowHtml = '<tr>';
-                        selectedCols.forEach(colIndex => {
-                            let cellData = rowData[colIndex] || "";
-                            cellData = $("<div>").html(cellData).text().trim();
-                            rowHtml += `<td>${cellData}</td>`;
-                        });
-                        rowHtml += '</tr>';
-                        return rowHtml;
-                    }).join('')}
-                </tbody>
-            </table>
-            <div class="footer">
-                <p>© 2025 SkillBridge - Recruitment Management System</p>
-            </div>
-        </body>
-        </html>
-    `;
-    
-    // Open print window
-    let printWindow = window.open('', '_blank');
-    printWindow.document.write(html);
-    printWindow.document.close();
-    
-    // Wait for content to load then trigger print
-    printWindow.onload = function() {
-        printWindow.print();
-        // Close window after printing (optional)
-        setTimeout(() => {
-            printWindow.close();
-        }, 100);
-    };
+    try {
+        // Create printable HTML
+        let html = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>${fileName}</title>
+                <style>
+                    body { font-family: Arial, sans-serif; margin: 20px; }
+                    h1 { color: #333; text-align: center; margin-bottom: 20px; }
+                    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                    th { background-color: #4a5568; color: white; padding: 10px; text-align: left; border: 1px solid #ddd; }
+                    td { padding: 8px; border: 1px solid #ddd; }
+                    tr:nth-child(even) { background-color: #f9fafb; }
+                    .footer { margin-top: 30px; text-align: center; color: #666; font-size: 12px; }
+                </style>
+            </head>
+            <body>
+                <h1>${currentExportRole} Report</h1>
+                <p style="text-align: center; color: #666;">Generated on ${new Date().toLocaleString()}</p>
+                <table>
+                    <thead>
+                        <tr>
+                            ${columnTitles.map(title => `<th>${title}</th>`).join('')}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${rows.map(rowData => {
+                            let rowHtml = '<tr>';
+                            selectedCols.forEach(colIndex => {
+                                let cellData = rowData[colIndex] || "";
+                                cellData = $("<div>").html(cellData).text().trim();
+                                rowHtml += `<td>${cellData}</td>`;
+                            });
+                            rowHtml += '</tr>';
+                            return rowHtml;
+                        }).join('')}
+                    </tbody>
+                </table>
+                <div class="footer">
+                    <p>© 2025 SkillBridge - Recruitment Management System</p>
+                </div>
+            </body>
+            </html>
+        `;
+        
+        // Open print window
+        let printWindow = window.open('', '_blank');
+        printWindow.document.write(html);
+        printWindow.document.close();
+        
+        // Wait for content to load then trigger print
+        printWindow.onload = function() {
+            printWindow.print();
+            // Close window after printing (optional)
+            setTimeout(() => {
+                printWindow.close();
+            }, 100);
+        };
+        
+        console.log("PDF/Print export completed");
+    } catch (error) {
+        console.error("PDF export error:", error);
+        notyf.error("PDF export failed: " + error.message);
+    }
 }
 
 function printTable(rows, selectedCols, columnTitles) {
     // Same as PDF but directly print
     exportToPDF(rows, selectedCols, columnTitles, currentExportRole + "_Report");
 }
-
-// Close export modal
-$("#closeExportModal, #cancelExport").click(function() {
-    $("#exportModal").addClass("hidden");
-});
-
-
-
-function loadUsers(role) {
-    currentExportRole = role; // Store current role for export
-    let tableId = role.toLowerCase() + "Table";
-
-    if ($.fn.DataTable.isDataTable("#" + tableId)) {
-        $("#" + tableId).DataTable().destroy();
-        $("#" + tableId + "Body").empty(); 
-    }
-
-    ajaxGet("getAllUsersByRole", {
-        role: role
-    }, function(res) {
-        if (res.status == "success" && res.users && res.users.length > 0) {
-            res.users.sort((a,b)=>{
-                let statusA=a.status?1:0;
-                let statusB=b.status?1:0;
-                return statusB-statusA;
-            });
-            
-            let rows = "";
-            res.users.forEach((u) => {
-                rows += buildTableRow(u, role);
-            });
-            $("#" + tableId + "Body").html(rows);
-
-            // Initialize DataTable without default export buttons
-            $("#" + tableId).DataTable({
-                paging: true,
-                searching: true,
-                info: true,
-                responsive: true,
-                ordering: false,
-                autoWidth: false,
-                columnDefs: [{
-                    targets: -1, 
-                    orderable: false,
-                    className: 'text-center'
-                }],
-                destroy: true
-            });
-        } else {
-            let colCount = role == "PANEL" ? 7 : role == "CANDIDATE" ? 7 : 6;
-            $("#" + tableId + "Body").html(
-                `<tr><td colspan="${colCount}" class="text-center">No users found</td></tr>`
-            );
-        }
-    });
-}
-
-
-
-<!-- SheetJS for Excel export -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-
-<!-- Material Icons -->
-<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
