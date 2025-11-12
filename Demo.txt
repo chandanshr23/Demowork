@@ -1,414 +1,81 @@
-package com.recruitement.mail;
-
-import java.util.Properties;
-
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
-
-import jakarta.mail.Authenticator;
-import jakarta.mail.Message;
-import jakarta.mail.MessagingException;
-import jakarta.mail.PasswordAuthentication;
-import jakarta.mail.Session;
-import jakarta.mail.Transport;
-import jakarta.mail.internet.InternetAddress;
-import jakarta.mail.internet.MimeMessage;
-
-public class MailUtility {
-
-    private static final Logger logger = LogManager.getLogger(MailUtility.class);
-    
-    private static final String FROM_EMAIL = "ranjithgm@datazoic.com"; 
-    private static final String PASSWORD = "bhnpcyqkyrpvkbgh";  
-    private static final String SMTP_HOST = "smtp.office365.com";
-    private static final String SMTP_PORT = "587";
-    
-    /**
-     * Send plain text email
-     */
-    public static boolean sendEmail(String to, String subject, String body) {
-        Properties props = new Properties();
-        props.put("mail.smtp.auth", "true"); 
-        props.put("mail.smtp.starttls.enable", "true");
-        props.put("mail.smtp.host", SMTP_HOST);
-        props.put("mail.smtp.port", SMTP_PORT);
-
-        Session session = Session.getInstance(props, new Authenticator() {
-            protected PasswordAuthentication getPasswordAuthentication() {
-                return new PasswordAuthentication(FROM_EMAIL, PASSWORD);
-            }
-        });
-
-        try {
-            Message message = new MimeMessage(session);
-            message.setFrom(new InternetAddress(FROM_EMAIL));
-            message.setRecipients(Message.RecipientType.TO, InternetAddress.parse(to));
-            message.setSubject(subject);
-            message.setText(body);
-
-            Transport.send(message);
-            logger.info("Email sent successfully to " + to);
-            return true;
-
-        } catch (MessagingException e) {
-            logger.error("Failed to send email to " + to, e);
-            return false;
-        }
-    }
-    
-    /**
-     * Send welcome email with credentials to new user
-     */
-    public static boolean sendWelcomeEmail(String to, String fullName, String username, 
-                                          String password, String role) {
-        String subject = "Welcome to SkillBridge - Your Account Credentials";
-        
-        String body = "Dear " + fullName + ",\n\n" +
-                     "Welcome to SkillBridge Recruitment Management System!\n\n" +
-                     "Your account has been successfully created. Here are your login credentials:\n\n" +
-                     "Username: " + username + "\n" +
-                     "Password: " + password + "\n" +
-                     "Role: " + role + "\n\n" +
-                     "SECURITY NOTICE: Please change your password after your first login.\n\n" +
-                     "Login URL: http://localhost:8080/YourApp/index.html\n\n" +
-                     "If you have any questions, please contact your administrator.\n\n" +
-                     "Best regards,\n" +
-                     "SkillBridge Team\n\n" +
-                     "---\n" +
-                     "© 2025 SkillBridge - Recruitment Management System\n" +
-                     "This is an automated email. Please do not reply.";
-        
-        return sendEmail(to, subject, body);
-    }
-}
-
-
-
-
-
-
 <!-- Profile Slide Panel -->
 <div id="profilePanel" class="hidden fixed inset-0 bg-black/50 z-50">
-  <div class="fixed right-0 top-0 h-full w-96 bg-white shadow-2xl transform translate-x-full transition-transform duration-300" id="profileSlide">
-    <div class="p-6 border-b flex justify-between items-center">
+  <div class="fixed right-0 top-0 h-full w-96 bg-white shadow-2xl transform translate-x-full transition-transform duration-300 flex flex-col" id="profileSlide">
+    <!-- Fixed Header -->
+    <div class="p-6 border-b flex justify-between items-center flex-shrink-0 bg-white">
       <h2 class="text-xl font-bold">My Profile</h2>
       <button id="closeProfile" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
     </div>
     
-    <div class="p-6 space-y-6 overflow-y-auto h-[calc(100%-80px)]">
-      <!-- Profile Info -->
-      <div class="space-y-4">
-        <div>
-          <label class="block text-sm text-gray-600 mb-1">Username</label>
-          <input type="text" id="profileUsername" class="w-full border rounded p-2 bg-gray-100" readonly>
+    <!-- Scrollable Content -->
+    <div class="flex-1 overflow-y-auto">
+      <div class="p-6 space-y-6">
+        <!-- Profile Info -->
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm text-gray-600 mb-1">Username</label>
+            <input type="text" id="profileUsername" class="w-full border rounded p-2 bg-gray-100" readonly>
+          </div>
+          <div>
+            <label class="block text-sm text-gray-600 mb-1">Email</label>
+            <input type="email" id="profileEmail" class="w-full border rounded p-2 bg-gray-100" readonly>
+          </div>
+          <div>
+            <label class="block text-sm text-gray-600 mb-1">Full Name <span class="text-red-500">*</span></label>
+            <input type="text" id="profileFullName" class="w-full border rounded p-2">
+            <p id="profileFullName_error" class="text-red-500 text-xs mt-1"></p>
+          </div>
+          <div>
+            <label class="block text-sm text-gray-600 mb-1">Phone <span class="text-red-500">*</span></label>
+            <input type="tel" id="profilePhone" class="w-full border rounded p-2" pattern="[0-9]{10}">
+            <p id="profilePhone_error" class="text-red-500 text-xs mt-1"></p>
+          </div>
+          <div id="profileExpertiseBlock" class="hidden">
+            <label class="block text-sm text-gray-600 mb-1">Expertise</label>
+            <input type="text" id="profileExpertise" class="w-full border rounded p-2">
+          </div>
         </div>
-        <div>
-          <label class="block text-sm text-gray-600 mb-1">Email</label>
-          <input type="email" id="profileEmail" class="w-full border rounded p-2 bg-gray-100" readonly>
+
+        <!-- Save Profile Button -->
+        <div class="border-t pt-4">
+          <button id="saveProfile" class="w-full bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+            Save Profile Changes
+          </button>
         </div>
-        <div>
-          <label class="block text-sm text-gray-600 mb-1">Full Name</label>
-          <input type="text" id="profileFullName" class="w-full border rounded p-2">
-        </div>
-        <div>
-          <label class="block text-sm text-gray-600 mb-1">Phone</label>
-          <input type="tel" id="profilePhone" class="w-full border rounded p-2" pattern="[0-9]{10}">
-        </div>
-        <div id="profileExpertiseBlock" class="hidden">
-          <label class="block text-sm text-gray-600 mb-1">Expertise</label>
-          <input type="text" id="profileExpertise" class="w-full border rounded p-2">
-        </div>
-        
+
         <!-- Change Password Section -->
         <div class="border-t pt-4 mt-4">
-          <h3 class="text-md font-semibold mb-3 text-gray-700">Change Password</h3>
-          <div class="space-y-3">
+          <button id="togglePasswordSection" class="w-full bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700 mb-3">
+            Change Password
+          </button>
+          
+          <div id="passwordSection" class="hidden space-y-3">
+            <h3 class="text-md font-semibold mb-3 text-gray-700">Change Password</h3>
+            
             <div>
-              <label class="block text-sm text-gray-600 mb-1">Current Password</label>
-              <input type="password" id="currentPassword" class="w-full border rounded p-2">
+              <label class="block text-sm text-gray-600 mb-1">Current Password <span class="text-red-500">*</span></label>
+              <input type="password" id="currentPassword" class="w-full border rounded p-2" placeholder="Enter current password">
               <p id="currentPassword_error" class="text-red-500 text-xs mt-1"></p>
             </div>
+            
             <div>
-              <label class="block text-sm text-gray-600 mb-1">New Password</label>
-              <input type="password" id="newPassword" class="w-full border rounded p-2">
+              <label class="block text-sm text-gray-600 mb-1">New Password <span class="text-red-500">*</span></label>
+              <input type="password" id="newPassword" class="w-full border rounded p-2" placeholder="Min 8 characters">
               <p id="newPassword_error" class="text-red-500 text-xs mt-1"></p>
             </div>
+            
             <div>
-              <label class="block text-sm text-gray-600 mb-1">Confirm New Password</label>
-              <input type="password" id="confirmPassword" class="w-full border rounded p-2">
+              <label class="block text-sm text-gray-600 mb-1">Confirm New Password <span class="text-red-500">*</span></label>
+              <input type="password" id="confirmPassword" class="w-full border rounded p-2" placeholder="Re-enter new password">
               <p id="confirmPassword_error" class="text-red-500 text-xs mt-1"></p>
             </div>
+            
             <button id="changePasswordBtn" class="w-full bg-orange-600 text-white px-4 py-2 rounded hover:bg-orange-700">
               Change Password
             </button>
           </div>
         </div>
       </div>
-      
-      <!-- Save Button -->
-      <div class="border-t pt-4">
-        <button id="saveProfile" class="w-full bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
-          Save Changes
-        </button>
-      </div>
     </div>
   </div>
 </div>
-
-
-
-
-// Add to UserDAO.java
-int changePassword(int userId, String currentPassword, String newPassword);
-
-// Add to UserDAOImpl.java
-@Override
-public int changePassword(int userId, String currentPassword, String newPassword) {
-    int rows = 0;
-    Connection conn = null;
-    PreparedStatement checkStmt = null;
-    PreparedStatement updateStmt = null;
-    ResultSet rs = null;
-    
-    try {
-        conn = DBConnector.getConnection();
-        
-        // First verify current password
-        String checkSql = "SELECT password FROM chandan_recruitement.M_D_USER WHERE user_id=?";
-        checkStmt = conn.prepareStatement(checkSql);
-        checkStmt.setInt(1, userId);
-        rs = checkStmt.executeQuery();
-        
-        if (rs.next()) {
-            String storedHash = rs.getString("password");
-            
-            // Verify current password
-            if (BCrypt.checkpw(currentPassword, storedHash)) {
-                // Hash new password
-                String newHash = BCrypt.hashpw(newPassword, BCrypt.gensalt());
-                
-                // Update password
-                String updateSql = "UPDATE chandan_recruitement.M_D_USER SET password=?, update_time=GETDATE() WHERE user_id=?";
-                updateStmt = conn.prepareStatement(updateSql);
-                updateStmt.setString(1, newHash);
-                updateStmt.setInt(2, userId);
-                rows = updateStmt.executeUpdate();
-                
-                logger.info("Password changed successfully for userId: " + userId);
-            } else {
-                logger.warn("Current password verification failed for userId: " + userId);
-                return -1; // Special code for wrong current password
-            }
-        }
-        
-    } catch (Exception e) {
-        e.printStackTrace();
-    } finally {
-        try {
-            if(rs != null) rs.close();
-            if(checkStmt != null) checkStmt.close();
-            if(updateStmt != null) updateStmt.close();
-            if(conn != null) conn.close();
-        } catch(Exception e) {
-            e.printStackTrace();
-        }
-    }
-    return rows;
-}
-
-
-
-
-
-<!-- Export Column Selection Modal -->
-<div id="exportModal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-  <div class="bg-white rounded-lg shadow-lg w-96 p-6">
-    <div class="flex justify-between items-center mb-4">
-      <h3 class="text-xl font-semibold text-gray-800">Export Options</h3>
-      <button id="closeExportModal" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
-    </div>
-    
-    <div class="mb-4">
-      <label class="block text-sm font-medium text-gray-700 mb-2">Export Format</label>
-      <select id="exportFormat" class="w-full border rounded p-2">
-        <option value="excel">Excel (XLSX)</option>
-        <option value="pdf">PDF</option>
-        <option value="print">Print</option>
-      </select>
-    </div>
-    
-    <div class="mb-4">
-      <label class="block text-sm font-medium text-gray-700 mb-2">Column Selection</label>
-      <div class="flex items-center gap-4 mb-2">
-        <label class="flex items-center">
-          <input type="radio" name="columnOption" value="all" checked class="mr-2">
-          <span class="text-sm">All Columns</span>
-        </label>
-        <label class="flex items-center">
-          <input type="radio" name="columnOption" value="specific" class="mr-2">
-          <span class="text-sm">Select Columns</span>
-        </label>
-      </div>
-      
-      <!-- Column Checkboxes (shown when "Select Columns" is chosen) -->
-      <div id="columnCheckboxes" class="hidden mt-3 max-h-60 overflow-y-auto border rounded p-3">
-        <!-- Will be dynamically populated -->
-      </div>
-    </div>
-    
-    <div class="flex justify-end gap-2 mt-6">
-      <button id="cancelExport" class="bg-gray-300 px-4 py-2 rounded hover:bg-gray-400">Cancel</button>
-      <button id="confirmExport" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Export</button>
-    </div>
-  </div>
-</div>
-
-
-
-
-
-// Updated importQuestions method in AssessmentServiceImpl.java
-public JsonObject importQuestions(int assessmentId, String newQuestionsJson, int totalMarks, int totalQuestions) {
-    JsonObject response = new JsonObject();
-    Connection conn = null;
-    PreparedStatement ps = null;
-    ResultSet rs = null;
-
-    try {
-        // Validate input
-        if (newQuestionsJson == null || newQuestionsJson.trim().isEmpty()) {
-            response.addProperty("status", "error");
-            response.addProperty("message", "No questions data provided");
-            return response;
-        }
-        
-        conn = DBConnector.getConnection();
-
-        // Fetch existing questions
-        String fetchQuery = "SELECT questions FROM chandan_recruitement.M_S_ASSESSMENT WHERE assessment_id = ?";
-        ps = conn.prepareStatement(fetchQuery);
-        ps.setInt(1, assessmentId);
-        rs = ps.executeQuery();
-
-        JsonArray existingQuestions = new JsonArray();
-        if (rs.next()) {
-            String existingJson = rs.getString("questions");
-            if (existingJson != null && !existingJson.trim().isEmpty() && 
-                !existingJson.equals("[]") && !existingJson.equals("null")) {
-                try {
-                    existingQuestions = JsonParser.parseString(existingJson).getAsJsonArray();
-                } catch (Exception e) {
-                    logger.error("Error parsing existing questions: " + e.getMessage());
-                    existingQuestions = new JsonArray();
-                }
-            }
-        }
-
-        // Parse new questions
-        JsonArray newQuestions;
-        try {
-            newQuestions = JsonParser.parseString(newQuestionsJson).getAsJsonArray();
-        } catch (Exception e) {
-            response.addProperty("status", "error");
-            response.addProperty("message", "Invalid JSON format for new questions");
-            logger.error("Failed to parse new questions JSON: " + e.getMessage());
-            return response;
-        }
-
-        // Validate each question has required fields
-        int nextQuestionId = existingQuestions.size() + 1;
-        int calculatedMarks = 0;
-        
-        for (JsonElement element : newQuestions) {
-            if (!element.isJsonObject()) {
-                continue;
-            }
-            
-            JsonObject q = element.getAsJsonObject();
-            
-            // Ensure question has an ID
-            if (!q.has("question_id") || q.get("question_id").isJsonNull()) {
-                q.addProperty("question_id", nextQuestionId++);
-            }
-            
-            // Validate required fields - set defaults if null
-            if (!q.has("question_text") || q.get("question_text").isJsonNull()) {
-                q.addProperty("question_text", "");
-            }
-            if (!q.has("option_a") || q.get("option_a").isJsonNull()) {
-                q.addProperty("option_a", "");
-            }
-            if (!q.has("option_b") || q.get("option_b").isJsonNull()) {
-                q.addProperty("option_b", "");
-            }
-            if (!q.has("option_c") || q.get("option_c").isJsonNull()) {
-                q.addProperty("option_c", "");
-            }
-            if (!q.has("option_d") || q.get("option_d").isJsonNull()) {
-                q.addProperty("option_d", "");
-            }
-            if (!q.has("correct_answer") || q.get("correct_answer").isJsonNull()) {
-                q.addProperty("correct_answer", "A");
-            }
-            if (!q.has("marks") || q.get("marks").isJsonNull()) {
-                q.addProperty("marks", 1);
-            }
-            
-            // Calculate total marks
-            calculatedMarks += q.get("marks").getAsInt();
-            
-            // Add to existing questions
-            existingQuestions.add(q);
-        }
-
-        // Calculate final totals
-        int finalTotalQuestions = existingQuestions.size();
-        int finalTotalMarks = 0;
-        
-        // Recalculate total marks from all questions
-        for (JsonElement element : existingQuestions) {
-            if (element.isJsonObject()) {
-                JsonObject q = element.getAsJsonObject();
-                if (q.has("marks") && !q.get("marks").isJsonNull()) {
-                    finalTotalMarks += q.get("marks").getAsInt();
-                }
-            }
-        }
-
-        // Update database
-        String updateQuery = "UPDATE chandan_recruitement.M_S_ASSESSMENT SET questions = ?, total_marks = ?, total_questions = ? WHERE assessment_id = ?";
-        
-        ps = conn.prepareStatement(updateQuery);
-        ps.setString(1, existingQuestions.toString());
-        ps.setInt(2, finalTotalMarks);
-        ps.setInt(3, finalTotalQuestions);
-        ps.setInt(4, assessmentId);
-        
-        int rowsUpdated = ps.executeUpdate();
-        
-        if (rowsUpdated > 0) {
-            response.addProperty("status", "success");
-            response.addProperty("message", "Questions imported successfully!");
-            response.addProperty("total_questions", finalTotalQuestions);
-            response.addProperty("total_marks", finalTotalMarks);
-            response.addProperty("new_questions_added", newQuestions.size());
-            
-            logger.info("Successfully imported " + newQuestions.size() + " questions. Total: " + finalTotalQuestions);
-        } else {
-            response.addProperty("status", "error");
-            response.addProperty("message", "Failed to update assessment");
-        }
-
-    } catch (Exception e) {
-        e.printStackTrace();
-        logger.error("Error importing questions: " + e.getMessage(), e);
-        response.addProperty("status", "error");
-        response.addProperty("message", "Error importing questions: " + e.getMessage());
-    } finally {
-        try { if (rs != null) rs.close(); } catch (Exception ignored) {}
-        try { if (ps != null) ps.close(); } catch (Exception ignored) {}
-        try { if (conn != null) conn.close(); } catch (Exception ignored) {}
-    }
-
-    return response;
-}
